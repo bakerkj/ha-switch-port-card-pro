@@ -1,0 +1,20 @@
+{
+  "domain": "switch_port_card_pro",
+  "name": "Switch Port Card Pro",
+  "codeowners": [
+    "@partach"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "lovelace",
+    "frontend"
+  ],
+  "documentation": "https://github.com/partach/switch_port_card_pro",
+  "integration_type": "hub",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/partach/switch_port_card_pro/issues",
+  "requirements": [
+    "puresnmp>=2.0.0"
+  ],
+  "version": "1.0.17"
+}

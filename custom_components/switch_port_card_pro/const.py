@@ -1,0 +1,172 @@
+# Copyright (c) 2025 partach (original switch_port_card_pro)
+# Copyright (c) 2026 Kenneth Baker <bakerkj@umich.edu> (modifications)
+# SPDX-License-Identifier: MIT
+
+"""Constants for Switch Port Card Pro."""
+
+from typing import Final
+
+DOMAIN: Final = "switch_port_card_pro"
+
+# Config entry keys
+CONF_HOST: Final = "host"
+CONF_SNMP_PORT = "snmp_port"
+CONF_COMMUNITY: Final = "community"
+CONF_PORTS: Final = "ports"
+CONF_PRIORITY_PORTS: Final = "priority_ports"
+CONF_FAST_UPDATE_INTERVAL: Final = "fast_update_interval"
+CONF_INCLUDE_VLANS: Final = "include_vlans"
+# Link single-client ports to their connected device via the FDB-learned MAC.
+CONF_ENABLE_PORT_MAC_LINK: Final = "enable_port_mac_link"
+CONF_SFP_PORTS_START = "sfp_ports_start"
+
+# Per-port attribute sensors a user wants enabled by default. Stored as a
+# list of sensor keys (see PORT_SENSOR_DESCRIPTIONS). Only applied at entity
+# creation time (new installs / newly-added ports), since Home Assistant
+# honors entity_registry_enabled_default only on first registration. When the
+# option is absent, each sensor falls back to its built-in default.
+CONF_DEFAULT_ENABLED_SENSORS: Final = "default_enabled_sensors"
+
+# --- Auto-manage per-port entities (Repairs-driven entity reduction) ---
+# Master opt-in switch. When off, the manager is inert.
+CONF_AUTO_MANAGE_ENTITIES: Final = "auto_manage_entities"
+# Hours a port must stay continuously down before a Repair issue is raised.
+CONF_DOWN_GRACE_HOURS: Final = "down_grace_hours"
+# Consecutive "on" polls before a port's previously-disabled extras are restored.
+CONF_UP_RESTORE_CYCLES: Final = "up_restore_cycles"
+
+DEFAULT_AUTO_MANAGE_ENTITIES: Final = False
+DEFAULT_DOWN_GRACE_HOURS: Final = 24
+DEFAULT_UP_RESTORE_CYCLES: Final = 3
+
+# Recorder decimation: publish high-rate per-port sensors only every Nth
+# full poll, phase-staggered across ports so emissions spread evenly. SNMP
+# still polls every cycle (no change in network/switch load) and rate
+# values are computed over the full N-poll window so no information is
+# lost — just fewer recorder rows. Priority ports bypass decimation so
+# they keep their explicit faster cadence. 1 disables the feature; 2
+# roughly halves recorder rows for rx_rate/tx_rate/poe_power; higher
+# values trade time resolution for more recorder savings.
+CONF_RECORD_DECIMATION: Final = "record_decimation"
+DEFAULT_RECORD_DECIMATION: Final = 2
+
+# Per-port entity keys the auto-manager must never disable: the on/off
+# indicator (`status`) and the telemetry carrier the frontend card reads
+# (`info`). Every other per-port entity for a down port is a disable
+# candidate. PORT_ANCHOR_KEY kept for backwards compatibility.
+PORT_ANCHOR_KEY: Final = "status"
+PORT_UNMANAGED_KEYS: Final = frozenset({"status", "info"})
+# Option keys (used in config flow)
+CONF_OID_RX: Final = "oid_rx"
+CONF_OID_TX: Final = "oid_tx"
+CONF_OID_STATUS: Final = "oid_status"
+CONF_OID_SPEED: Final = "oid_speed"
+CONF_OID_NAME: Final = "oid_name"
+CONF_OID_VLAN: Final = "oid_vlan"
+CONF_OID_POE_POWER: Final = "oid_poe_power"
+CONF_OID_POE_STATUS: Final = "oid_poe_status"
+CONF_OID_POE_CLASS: Final = "oid_poe_class"
+CONF_OID_CUSTOM: Final = "oid_custom"
+# bridge port → ifIndex
+CONF_OID_DOT1D_BASE_PORT_IFINDEX: Final = "1.3.6.1.2.1.17.1.4.1.2"
+
+# HP/Aruba/ProCurve auto-detected OIDs (used when cpu/memory not manually configured)
+# real-time CPU % — works on HP 2530/2520 and Aruba 2930M
+HP_OID_CPU_REALTIME: Final = "1.3.6.1.4.1.11.2.14.11.5.1.9.6.1.0"
+# bytes used
+HP_OID_MEMORY_USED: Final = "1.3.6.1.4.1.11.2.14.11.5.1.1.2.1.1.1.6.1"
+# bytes total
+HP_OID_MEMORY_TOTAL: Final = "1.3.6.1.4.1.11.2.14.11.5.1.1.2.1.1.1.5.1"
+# actual per-port draw (mW) — newer HP/Aruba (2530, 2930)
+HP_OID_POE_POWER: Final = "1.3.6.1.4.1.11.2.14.11.1.9.1.1.1.8"
+# actual per-port draw (mW) — older HP (2520)
+HP_OID_POE_POWER_LEGACY: Final = "1.3.6.1.4.1.11.2.14.11.1.9.1.1.1.3"
+# pethPsePortOperStatus (RFC 3621)
+HP_OID_POE_STATUS: Final = "1.3.6.1.2.1.105.1.1.1.6"
+# pethPsePortPowerClassifications (RFC 3621)
+HP_OID_POE_CLASS: Final = "1.3.6.1.2.1.105.1.1.1.10"
+# hpicfBasicRunningRevision (running firmware version)
+HP_OID_FIRMWARE: Final = "1.3.6.1.4.1.11.2.14.11.5.1.1.3.0"
+HP_MANUFACTURER_KEYWORDS: Final = ("hp", "aruba", "procurve", "hewlett")
+CONF_OID_PORT_CUSTOM: Final = "oid_port_custom"
+CONF_OID_CPU: Final = "oid_cpu"
+CONF_OID_MEMORY: Final = "oid_memory"
+CONF_OID_MEMORY_TOTAL: Final = "oid_memory_total"
+CONF_OID_FIRMWARE: Final = "oid_firmware"
+CONF_OID_HOSTNAME: Final = "oid_hostname"
+CONF_OID_UPTIME: Final = "oid_uptime"
+CONF_OID_IDESCR: Final = "1.3.6.1.2.1.2.2.1.2"
+CONF_OID_IFTYPE: Final = "1.3.6.1.2.1.2.2.1.3"
+CONF_OID_IFSPEED: Final = "1.3.6.1.2.1.2.2.1.5"
+CONF_OID_IFHIGHSPEED: Final = "1.3.6.1.2.1.31.1.1.1.15"
+# ifHCInOctets (64-bit)
+CONF_OID_IFHCINOCTETS: Final = "1.3.6.1.2.1.31.1.1.1.6"
+# ifHCOutOctets (64-bit)
+CONF_OID_IFHCOUTOCTETS: Final = "1.3.6.1.2.1.31.1.1.1.10"
+# ifInErrors
+CONF_OID_IFINERRORS: Final = "1.3.6.1.2.1.2.2.1.14"
+# ifOutErrors
+CONF_OID_IFOUTERRORS: Final = "1.3.6.1.2.1.2.2.1.20"
+# ifInDiscards
+CONF_OID_IFINDISCARDS: Final = "1.3.6.1.2.1.2.2.1.13"
+# ifOutDiscards
+CONF_OID_IFOUTDISCARDS: Final = "1.3.6.1.2.1.2.2.1.19"
+# ifAdminStatus (1=up, 2=down, 3=testing)
+CONF_OID_IFADMINSTATUS: Final = "1.3.6.1.2.1.2.2.1.7"
+# ifLastChange (TimeTicks at last state change)
+CONF_OID_IFLASTCHANGE: Final = "1.3.6.1.2.1.2.2.1.9"
+# sysUpTime (TimeTicks since boot)
+CONF_OID_SYSUPTIME: Final = "1.3.6.1.2.1.1.3.0"
+# pethMainPsePower (watts)
+CONF_OID_POE_BUDGET_TOTAL: Final = "1.3.6.1.2.1.105.1.3.1.1.2"
+# pethMainPseConsumptionPower (watts)
+CONF_OID_POE_BUDGET_CONSUMED: Final = "1.3.6.1.2.1.105.1.3.1.1.3"
+CONF_OID_SYSDESCR: Final = "1.3.6.1.2.1.1.1.0"
+CONF_OID_SYSNAME: Final = "1.3.6.1.2.1.1.5.0"
+# MAU-MIB ifMauType (RFC 4836)
+CONF_OID_IFMAUTYPE: Final = "1.3.6.1.2.1.26.2.1.1.3"
+# entPhySensorType (RFC 3433)
+CONF_OID_ENT_SENSOR_TYPE: Final = "1.3.6.1.2.1.99.1.1.1.1"
+# entPhySensorValue
+CONF_OID_ENT_SENSOR_VALUE: Final = "1.3.6.1.2.1.99.1.1.1.4"
+# entPhySensorOperStatus (1=ok, 2=unavailable)
+CONF_OID_ENT_SENSOR_OPSTATUS: Final = "1.3.6.1.2.1.99.1.1.1.5"
+# entPhysicalName (ENTITY-MIB)
+CONF_OID_ENT_PHYSICAL_NAME: Final = "1.3.6.1.2.1.47.1.1.1.1.7"
+
+SNMP_VERSION_TO_MP_MODEL = {
+    "v1": 0,
+    "v2c": 1,
+    "v3": 2,
+}
+DEFAULT_SNMP_PORT: Final = 161
+# Default monitored ports (1–28 is safe for most 24+4 switches)
+# (kept at 8 — 29 is too many for most users)
+DEFAULT_PORTS: Final = list(range(1, 9))
+
+# Default per-port OIDs (standard + common working ones)
+DEFAULT_BASE_OIDS: Final = {
+    "rx": "1.3.6.1.2.1.2.2.1.10",  # ifInOctets (32-bit)
+    "tx": "1.3.6.1.2.1.2.2.1.16",  # ifOutOctets (32-bit)
+    "status": "1.3.6.1.2.1.2.2.1.8",  # ifOperStatus
+    "speed": "1.3.6.1.2.1.2.2.1.5",  # ifSpeed
+    "name": "1.3.6.1.2.1.31.1.1.1.18",  # ifAlias (modern description)
+    "vlan": "",  # User must set per-brand (e.g. Q-BRIDGE-MIB or private)
+    "poe_power": "",  # User must set (common: Cisco/Zyxel/TP-Link)
+    "poe_status": "",  # User must set
+    # 802.3af/at class (1=class0…5=class4). Standard: 1.3.6.1.2.1.105.1.1.1.10
+    "poe_class": "",
+    "port_custom": "",  # User must set
+}
+
+# Default system-level OIDs (most common working ones)
+DEFAULT_SYSTEM_OIDS: Final = {
+    "cpu": "",  # Usually private — user sets
+    "memory": "",  # Usually private (used bytes if memory_total set, else %)
+    # Optional: total bytes; if set, memory% = (memory/memory_total)*100
+    "memory_total": "",
+    "firmware": "",  # Usually private
+    "hostname": "1.3.6.1.2.1.1.5.0",  # sysName — works everywhere
+    "uptime": "1.3.6.1.2.1.1.3.0",  # sysUpTime — universal
+    "custom": "",  # user sets
+}

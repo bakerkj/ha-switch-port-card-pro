@@ -1,0 +1,94 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Switch Port Card Pro Setup",
+        "description": "Configure your SNMP-enabled network switch",
+        "data": {
+          "host": "Switch IP Address or Hostname",
+          "community": "SNMP Community String",
+          "snmp_port": "SNMP Port"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Switch Connection",
+        "description": "Update the IP address, community string, or SNMP port. A connection test will run before saving.",
+        "data": {
+          "host": "Switch IP Address or Hostname",
+          "community": "SNMP Community String",
+          "snmp_port": "SNMP Port"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to reach the switch. Check the IP address, SNMP port, and community string.",
+      "invalid_community": "Invalid SNMP community string.",
+      "unknown": "Unexpected error. Check the logs for details."
+    }
+  },
+  "options": {
+    "error": {
+      "invalid_oid": "Invalid OID format. Use dotted numeric notation (e.g. 1.3.6.1.2.1.1.1.0) or leave blank.",
+      "fast_interval_too_high": "Fast update interval must be less than the regular update interval. Set to 0 to disable."
+    },
+    "step": {
+      "options": {
+        "title": "Configure Switch Port Card Pro",
+        "description": "Customize OIDs and port settings for your switch",
+        "data": {
+          "update_interval": "Update Interval (seconds)",
+          "fast_update_interval": "Fast Update Interval for Priority Ports (seconds, 0 = disabled)",
+          "ports": "Ports to Monitor",
+          "priority_ports": "Priority Ports (polled at the fast interval; rx/tx/status/PoE only)",
+          "re_detect_ports": "Re-run port detection on save (overwrites port list)",
+          "include_vlans": "Enable VLAN monitoring (disable to skip VLAN walks)",
+          "default_enabled_sensors": "Per-port sensors enabled by default (applies to new installs and newly-added ports only; existing entities are unchanged)",
+          "auto_manage_entities": "Auto-manage per-port entities (suggest disabling sensors for long-down ports via Repairs; auto-restore when they come back)",
+          "down_grace_hours": "Down grace period (hours) before a port is flagged for cleanup",
+          "up_restore_cycles": "Consecutive 'up' polls before a restored port's sensors are re-enabled",
+          "record_decimation": "Recorder decimation (publish rx/tx/PoE every Nth poll; 1 = every poll, 2 ≈ halves recorder rows)",
+          "oid_rx": "Life-time RX Counter OID (for live RX calculation)",
+          "oid_tx": "Life-time TX Counter OID (for live TX calculation)",
+          "oid_status": "Port Status OID (determines on/off state)",
+          "oid_speed": "Port Speed OID (10M/100M/1G/etc. detection)",
+          "oid_name": "Port Name OID (user-assigned port names)",
+          "oid_vlan": "VLAN ID OID (port VLAN assignment)",
+          "oid_poe_power": "PoE Power OID (per-port power in mW)",
+          "oid_poe_status": "PoE Status OID (per-port PoE state)",
+          "oid_poe_class": "PoE Class OID (per-port, 802.3af/at class)",
+          "oid_port_custom": "Port Custom OID (per port)",
+          "oid_cpu": "CPU Load OID (percentage)",
+          "oid_memory": "Memory Usage OID (used bytes, or percentage if memory total is blank)",
+          "oid_memory_total": "Memory Total OID (total bytes; enables used/total % calculation)",
+          "oid_firmware": "Firmware Version OID (text string)",
+          "oid_hostname": "Hostname/Model OID (device identification)",
+          "oid_uptime": "Uptime OID (seconds, converted to D:H:M)",
+          "oid_custom": "Custom OID (displayed in system info box)",
+          "snmp_version": "SNMP Protocol Version"
+        }
+      }
+    }
+  },
+  "issues": {
+    "port_down": {
+      "title": "Switch {host}: port {port}{name_suffix} down for over {hours}h",
+      "fix_flow": {
+        "step": {
+          "init": {
+            "title": "Port {port}{name_suffix} on {host} has been down a while",
+            "description": "This port{name_suffix} has had no link for over {hours} hours. Its per-port sensors (rates, PoE, errors, etc.) carry no useful data while it is down — only the Status indicator does. Choose how to clean up. Disabled sensors are automatically re-enabled if the port comes back up. Frequently flapping ports are auto-detected and skip this warning on their own; use 'Allow this port to flap' to mute one explicitly until it stays stable.",
+            "menu_options": {
+              "disable_this": "Disable this port's extra sensors",
+              "disable_all": "Disable extra sensors for ALL flagged ports",
+              "ignore": "Ignore this port (keep its sensors)",
+              "allow_flap": "Allow this port to flap (mute until it stays stable)"
+            }
+          }
+        },
+        "abort": {
+          "not_found": "This switch is no longer configured."
+        }
+      }
+    }
+  }
+}

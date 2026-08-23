@@ -1,0 +1,3 @@
+A SNMP integration with a configurable Lovelace card for monitoring switch ports
+with real-time status, VLAN, Rx/Tx, and names. Fully customizable Card. Supports
+SNMP enabled switches. Full guided configurability
