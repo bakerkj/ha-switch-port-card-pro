@@ -28,6 +28,7 @@ from homeassistant.const import (
     UnitOfTime,
 )
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -36,6 +37,7 @@ from homeassistant.helpers.update_coordinator import (
     UpdateFailed,
 )
 from homeassistant.util import dt as dt_util
+from puresnmp.exc import SnmpError
 
 from .const import (
     CONF_DEFAULT_ENABLED_SENSORS,
@@ -225,11 +227,11 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
         if not do_full:
             try:
                 return await self._fast_update()
-            except Exception as err:
+            except SnmpError, OSError:
                 _LOGGER.debug(
-                    "Fast priority-port update failed on %s, falling back to full poll: %s",
+                    "Fast priority-port update failed on %s, falling back to full poll",
                     self.host,
-                    err,
+                    exc_info=True,
                 )
         return await self._full_update()
 
@@ -499,7 +501,7 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
                     return byte_index < len(bitmap_bytes) and bool(
                         (bitmap_bytes[byte_index] >> bit_index) & 1
                     )
-                except Exception:
+                except ValueError, IndexError, TypeError:
                     return False
 
             # Build if_index → bridge_port mapping and fetch per-VLAN egress bitmaps in parallel.
@@ -1173,7 +1175,7 @@ class SwitchPortBaseEntity(SensorEntity):
                 self.coordinator.last_update_success
                 and self.coordinator.data is not None
             )
-        except Exception:
+        except AttributeError:
             _LOGGER.error("Entity not available")
 
     async def async_will_remove_from_hass(self) -> None:
@@ -1217,10 +1219,8 @@ class SwitchPortBaseEntity(SensorEntity):
                         model=model,
                         sw_version=firmware,
                     )
-            except Exception as err:
-                _LOGGER.error(
-                    "Entity update failed for %s with error %s", self.host, err
-                )
+            except SnmpError, OSError:
+                _LOGGER.exception("Entity update failed for %s", self.host)
 
         # Run on each coordinator update
         self._unsub_devinfo = self.coordinator.async_add_listener(_update_device_info)
@@ -1466,7 +1466,7 @@ class SwitchPortPerPortBaseEntity(SensorEntity):
                 if desired:
                     kept.add((device_registry.CONNECTION_NETWORK_MAC, desired))
                 dev_reg.async_update_device(device_entry.id, new_connections=kept)
-        except Exception as err:
+        except HomeAssistantError as err:
             _LOGGER.debug(
                 "Port device update failed for %s port %s: %s",
                 self.coordinator.host,
@@ -1802,12 +1802,12 @@ class PortAttributeSensor(SwitchPortPerPortBaseEntity):
             return None
         try:
             return self._description.value_fn(self, p)
-        except Exception as err:
+        except ValueError, TypeError, KeyError, AttributeError, IndexError:
             _LOGGER.debug(
-                "value_fn failed for port %s/%s: %s",
+                "value_fn failed for port %s/%s",
                 self.port,
                 self._description.key,
-                err,
+                exc_info=True,
             )
             return None
 

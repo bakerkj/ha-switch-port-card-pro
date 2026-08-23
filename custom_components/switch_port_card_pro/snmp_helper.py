@@ -20,6 +20,7 @@ from functools import partial
 from typing import Any
 
 from puresnmp import V1, V2C, Client
+from puresnmp.exc import SnmpError
 from puresnmp.transport import send_udp
 from x690.types import ObjectIdentifier, OctetString
 
@@ -318,8 +319,8 @@ async def async_snmp_get(
         return _value_to_str(value)
     except asyncio.CancelledError:
         raise
-    except Exception as exc:
-        _LOGGER.debug("SNMP GET failed on %s (oid=%s): %s", host, oid, exc)
+    except SnmpError, OSError:
+        _LOGGER.debug("SNMP GET failed on %s (oid=%s)", host, oid, exc_info=True)
         return None
 
 
@@ -364,8 +365,8 @@ async def async_snmp_walk(
             results[oid_str] = _value_to_str(vb.value)
     except asyncio.CancelledError:
         raise
-    except Exception as exc:
-        _LOGGER.debug("SNMP WALK failed on %s (%s): %s", host, base, exc)
+    except SnmpError, OSError:
+        _LOGGER.debug("SNMP WALK failed on %s (%s)", host, base, exc_info=True)
     return results
 
 
@@ -679,9 +680,7 @@ def _is_physical_interface(descr_lower: str, descr_clean: str, if_index: int) ->
 
     # Special case: single-digit descriptions
     if descr_clean.isdigit():
-        if if_index >= 1000:
-            return False
-        return True
+        return if_index < 1000
 
     return is_likely_physical
 
@@ -708,9 +707,10 @@ def _detect_sfp_port(
     Only used when MAU-MIB data is unavailable.
     """
     # HP/Aruba: uplink ports named A1-A4 are SFP slots
-    if any(m in manufacturer.lower() for m in HP_MANUFACTURER_KEYWORDS):
-        if re.match(r"^[a-z]\d+$", descr_lower):
-            return True, "hp_uplink_name"
+    if any(m in manufacturer.lower() for m in HP_MANUFACTURER_KEYWORDS) and re.match(
+        r"^[a-z]\d+$", descr_lower
+    ):
+        return True, "hp_uplink_name"
 
     # Netgear 10G special case
     if "10g - level" in descr_lower:

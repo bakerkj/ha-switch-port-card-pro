@@ -16,6 +16,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
+from puresnmp.exc import SnmpError
 
 from .const import (
     CONF_COMMUNITY,
@@ -78,7 +79,7 @@ async def async_install_frontend_resource(hass: HomeAssistant):
             else:
                 _LOGGER.warning("Frontend source file missing at %s", source_path)
 
-        except Exception as err:
+        except OSError as err:
             _LOGGER.error("Failed to install frontend resource: %s", err)
 
     # Offload the blocking file operations to the executor thread
@@ -188,7 +189,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             manufacturer = sample_info.get("manufacturer", "Unknown")
             detection_summary = _get_detection_summary(detected)
 
-            all_ports = sorted(int(p) for p in detected.keys())
+            all_ports = sorted(int(p) for p in detected)
 
             # Log detailed discovery results
             copper_count = sum(1 for p in detected.values() if p.get("is_copper"))
@@ -217,9 +218,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _DISCOVERY_TIMEOUT_S,
         )
         detected = None
-    except Exception as err:
+    except SnmpError, OSError:
         _LOGGER.debug(
-            "Port detection failed on %s: %s (will use manual config)", host, err
+            "Port detection failed on %s (will use manual config)", host, exc_info=True
         )
         detected = None
 
@@ -232,7 +233,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         if detected:
             # Auto-configure from detection
-            all_ports = sorted(int(p) for p in detected.keys())
+            all_ports = sorted(int(p) for p in detected)
             new_options[CONF_PORTS] = all_ports
 
             # Store SFP port range
@@ -298,7 +299,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             new_options["detection_method"] = detection_summary
 
             # 3. Port validation and configuration
-            all_detected = sorted(int(p) for p in detected.keys())
+            all_detected = sorted(int(p) for p in detected)
 
             if isinstance(user_ports, list) and user_ports:
                 max_user_port = max(user_ports)
