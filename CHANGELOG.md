@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.18](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.0.17...v1.0.18) (2026-08-24)
+
+
+### Miscellaneous Chores
+
+* set bakerkj as codeowner and point links at this repo ([#10](https://github.com/bakerkj/ha-switch-port-card-pro/issues/10)) ([4c8de8e](https://github.com/bakerkj/ha-switch-port-card-pro/commit/4c8de8eff1342b0fe004a0e09145c838c112d0e5))
+
 ## [1.0.17](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.0.16...v1.0.17) (2026-08-24)
 
 
