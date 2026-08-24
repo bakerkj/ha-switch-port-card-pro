@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
+  <defs>
+    <linearGradient id="chassis" x1="128" y1="72" x2="128" y2="184" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#33475C"/>
+      <stop offset="1" stop-color="#22303F"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="128" y1="72" x2="128" y2="132" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- switch chassis -->
+  <rect x="20" y="72" width="216" height="112" rx="20" fill="url(#chassis)"/>
+  <rect x="20" y="72" width="216" height="56" rx="20" fill="url(#sheen)"/>
+
+  <!-- status LEDs -->
+  <circle cx="46" cy="98" r="6" fill="#3DDC84"/>
+  <circle cx="68" cy="98" r="6" fill="#FFC24B"/>
+
+  <!-- port bank -->
+  <g fill="#41BDF5">
+    <rect x="40" y="126" width="24" height="34" rx="5"/>
+    <rect x="72" y="126" width="24" height="34" rx="5"/>
+    <rect x="104" y="126" width="24" height="34" rx="5"/>
+    <rect x="136" y="126" width="24" height="34" rx="5"/>
+    <rect x="168" y="126" width="24" height="34" rx="5"/>
+    <rect x="200" y="126" width="16" height="34" rx="5" fill="#7FD8FA"/>
+  </g>
+  <!-- port pins -->
+  <g fill="#22303F">
+    <rect x="48" y="126" width="8" height="7"/>
+    <rect x="80" y="126" width="8" height="7"/>
+    <rect x="112" y="126" width="8" height="7"/>
+    <rect x="144" y="126" width="8" height="7"/>
+    <rect x="176" y="126" width="8" height="7"/>
+  </g>
+</svg>
