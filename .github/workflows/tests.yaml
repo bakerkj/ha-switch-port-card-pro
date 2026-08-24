@@ -30,12 +30,13 @@ jobs:
           uv run --no-sync python -c "from homeassistant.const import
           __version__; print(__version__)"
 
-      # Enforced coverage floor. Current suite covers ~51% (const/repairs 100%,
-      # entity_manager 86%, config_flow 76%; the live SNMP coordinator in
-      # sensor.py and setup in __init__.py are the remaining gaps, since they
-      # need real SNMP I/O). Ratchet this up as those land — never lower it.
+      # Enforced coverage floor. Current suite covers ~52% (const/repairs 100%,
+      # entity_manager 86%, config_flow 76%; the port-to-device MAC reconcile is
+      # tested against a real device registry). The remaining gaps are the live
+      # SNMP coordinator update paths in sensor.py and setup in __init__.py,
+      # which need real SNMP I/O. Ratchet this up as those land — never lower it.
       - name: Tests (with coverage gate)
         run: >-
           uv run --no-sync python -m pytest tests/
           --cov=custom_components/switch_port_card_pro --cov-report=term-missing
-          --cov-fail-under=48 --durations=10
+          --cov-fail-under=50 --durations=10
