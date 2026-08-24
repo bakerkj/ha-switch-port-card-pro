@@ -56,6 +56,7 @@ from .const import (
     CONF_OID_IFOUTERRORS,
     CONF_OID_POE_BUDGET_TOTAL,
     CONF_OID_SYSUPTIME,
+    DEFAULT_MAX_CLIENTS_TO_LINK,
     DOMAIN,
     HP_MANUFACTURER_KEYWORDS,
     HP_OID_CPU_REALTIME,
@@ -66,6 +67,8 @@ from .const import (
     HP_OID_POE_POWER,
     HP_OID_POE_POWER_LEGACY,
     HP_OID_POE_STATUS,
+    OID_LLDP_LOC_CHASSIS_ID,
+    OID_LLDP_REM_CHASSIS_ID,
     SNMP_VERSION_TO_MP_MODEL,
 )
 from .snmp_helper import (
@@ -83,6 +86,40 @@ _LOGGER = logging.getLogger(__name__)
 # (vs. poll/network/clock jitter). Anything inside this window keeps the
 # previously cached boot datetime so the sensor doesn't churn every poll.
 BOOT_TIME_JITTER_S = 5.0
+
+
+def _chassis_id_to_mac(value: str) -> str | None:
+    """An LLDP chassis-id as ``aa:bb:cc:dd:ee:ff``, or None if it isn't a MAC.
+
+    async_snmp_walk renders a binary OctetString as ``0x<hex>`` (see
+    _value_to_str). lldpChassisIdSubtype = macAddress(4) is six octets, so a
+    ``0x`` value with 12 hex digits is the neighbour's MAC; any other
+    chassis-id subtype (a system name, a network address, an interface name)
+    is not a linkable MAC and is skipped. A MAC whose six octets happen to all
+    be printable ASCII would decode to text instead of ``0x`` and be missed --
+    vanishingly unlikely for real AP/switch OUIs, and only a missed link, not a
+    wrong one.
+    """
+    if value.startswith("0x"):
+        hexpart = value[2:]
+        if len(hexpart) == 12:
+            try:
+                int(hexpart, 16)
+            except ValueError:
+                return None
+            return ":".join(hexpart[i : i + 2] for i in range(0, 12, 2))
+    return None
+
+
+def _select_port_link_macs(neighbor_macs: set[str], fdb_macs: set[str]) -> list[str]:
+    """A port's link MACs: the LLDP neighbour outright, else the FDB clients.
+
+    LLDP wins whenever a neighbour is present -- so an AP-uplink port links to
+    the AP alone and never to the wifi clients the FDB also sees on it, even
+    when the AP momentarily reports a single client. The FDB set is used only
+    when there is no neighbour. Sorted for a stable, comparable result.
+    """
+    return sorted(neighbor_macs or fdb_macs)
 
 
 @dataclass
@@ -132,6 +169,8 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
         self.device_name: str | None = None
         self.manufacturer: str = "Unknown"
         self.enable_port_mac_link: bool = True
+        self.enable_port_lldp_link: bool = True
+        self.max_clients_to_link: int = DEFAULT_MAX_CLIENTS_TO_LINK
         self.entity_manager: PortEntityManager | None = None
         # How many fast ticks make up one slow tick. 1 means feature is effectively off.
         self._slow_every = (
@@ -571,9 +610,17 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
                     except ValueError, IndexError:
                         continue
 
-            # Learn each single-client edge port's MAC from the FDB (skip
-            # uplinks/trunks, which carry many MACs). Opt-in; one extra SNMP walk.
+            # Learn each edge port's linkable MAC(s) so 2026.8 links the port
+            # device to whatever is on the other end. Two sources, LLDP first:
+            #   * the LLDP neighbour's chassis MAC -- one stable neighbour per
+            #     port (an AP or a switch). Preferred: immune to the FDB "an
+            #     uplink momentarily shows a single client" flap that would
+            #     misroute the link onto that client.
+            #   * FDB-learned client MAC(s) -- the fallback for a port with no
+            #     LLDP neighbour, capped at max_clients_to_link learned clients.
+            # Each source is opt-in and adds an SNMP walk.
             ifindex_to_client_mac: dict[int, str] = {}
+            ifindex_to_fdb_macs: dict[int, set[str]] = {}
             if getattr(self, "enable_port_mac_link", False):
                 bridge_fdb, fdb_walk = await asyncio.gather(
                     async_snmp_walk(
@@ -624,12 +671,78 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
                 for if_index_f, macs in if_macs.items():
                     for mac in macs:
                         mac_to_ifindexes.setdefault(mac, set()).add(if_index_f)
+                max_clients = max(1, getattr(self, "max_clients_to_link", 1))
                 for if_index_f, macs in if_macs.items():
-                    if len(macs) != 1:  # single-client edge port only
+                    # Uplinks/trunks carry many MACs; never link those.
+                    if not 1 <= len(macs) <= max_clients:
                         continue
-                    mac = next(iter(macs))
-                    if len(mac_to_ifindexes[mac]) == 1:  # and on exactly one port
-                        ifindex_to_client_mac[if_index_f] = mac
+                    unique = {m for m in macs if len(mac_to_ifindexes[m]) == 1}
+                    if unique:
+                        ifindex_to_fdb_macs[if_index_f] = unique
+                    if len(macs) == 1 and unique:  # single-client: also the display MAC
+                        ifindex_to_client_mac[if_index_f] = next(iter(unique))
+
+            # LLDP: the neighbour's chassis MAC on each local port, plus this
+            # switch's own chassis MAC (published on its device so a neighbour
+            # running this integration links back to it). Local port number ==
+            # ifIndex on the HP/Aruba switches this targets.
+            ifindex_to_neighbor_macs: dict[int, set[str]] = {}
+            switch_chassis_mac: str | None = None
+            if getattr(self, "enable_port_lldp_link", False):
+                lldp_rem, lldp_loc = await asyncio.gather(
+                    async_snmp_walk(
+                        self.hass,
+                        self.host,
+                        self.community,
+                        self.snmp_port,
+                        OID_LLDP_REM_CHASSIS_ID,
+                        mp_model=self.mp_model,
+                    ),
+                    async_snmp_walk(
+                        self.hass,
+                        self.host,
+                        self.community,
+                        self.snmp_port,
+                        OID_LLDP_LOC_CHASSIS_ID,
+                        mp_model=self.mp_model,
+                    ),
+                )
+                switch_chassis_mac = next(
+                    (m for m in map(_chassis_id_to_mac, lldp_loc.values()) if m),
+                    None,
+                )
+                lldp_if_macs: dict[int, set[str]] = {}
+                for l_oid, l_val in lldp_rem.items():
+                    # index tail = timeMark.lldpLocPortNum.lldpRemIndex
+                    idx = l_oid[len(OID_LLDP_REM_CHASSIS_ID) + 1 :].split(".")
+                    if len(idx) < 3:
+                        continue
+                    try:
+                        loc_port = int(idx[1])
+                    except ValueError:
+                        continue
+                    neighbor_mac = _chassis_id_to_mac(l_val)
+                    if neighbor_mac is None:
+                        continue
+                    lldp_if_macs.setdefault(loc_port, set()).add(neighbor_mac)
+                # Same one-port-per-MAC guard as the FDB path: a neighbour cabled
+                # to two local ports (a LAG) must not double-stamp its MAC.
+                lldp_mac_ports: dict[str, set[int]] = {}
+                for lp, macs in lldp_if_macs.items():
+                    for neighbor_mac in macs:
+                        lldp_mac_ports.setdefault(neighbor_mac, set()).add(lp)
+                for lp, macs in lldp_if_macs.items():
+                    unique = {m for m in macs if len(lldp_mac_ports[m]) == 1}
+                    if unique:
+                        ifindex_to_neighbor_macs[lp] = unique
+
+            # Per port the LLDP neighbour wins outright; the FDB is the fallback.
+            ifindex_to_link_macs: dict[int, list[str]] = {}
+            for if_index_l in set(ifindex_to_neighbor_macs) | set(ifindex_to_fdb_macs):
+                ifindex_to_link_macs[if_index_l] = _select_port_link_macs(
+                    ifindex_to_neighbor_macs.get(if_index_l, set()),
+                    ifindex_to_fdb_macs.get(if_index_l, set()),
+                )
 
             ports_data: dict[str, dict[str, Any]] = {}
             total_rx = total_tx = total_poe_mw = 0
@@ -666,6 +779,7 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
                     "last_change": None,
                     "last_change_seconds": None,
                     "client_mac": ifindex_to_client_mac.get(if_index),
+                    "link_macs": ifindex_to_link_macs.get(if_index, []),
                 }
 
                 # For VLAN: dot1qPvid is indexed by bridge port, not ifIndex (RFC 4363).
@@ -884,6 +998,7 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
                 ),
                 "custom": get("custom"),
                 "boot_time": self._resolve_boot_time(sys_uptime_ticks),
+                "chassis_mac": switch_chassis_mac,
             }
 
             # HP/Aruba auto-detection: fill in cpu/memory/firmware if not manually configured.
@@ -1249,11 +1364,24 @@ class SwitchPortBaseEntity(SensorEntity):
                     identifiers={(DOMAIN, f"{self.entry_id}_{self.coordinator.host}")}
                 )
                 if device_entry:
+                    # Publish our own chassis MAC (additively) so a neighbour
+                    # switch running this integration, which stamps this MAC on
+                    # its uplink port, links that port back to this device.
+                    chassis_mac = system.get("chassis_mac")
+                    extra: dict[str, Any] = {}
+                    if chassis_mac:
+                        extra["merge_connections"] = {
+                            (
+                                device_registry.CONNECTION_NETWORK_MAC,
+                                device_registry.format_mac(chassis_mac),
+                            )
+                        }
                     dev_reg.async_update_device(
                         device_entry.id,
                         name=device_name,
                         model=model,
                         sw_version=firmware,
+                        **extra,
                     )
             except SnmpError, OSError:
                 _LOGGER.exception("Entity update failed for %s", self.coordinator.host)
@@ -1399,18 +1527,9 @@ class SwitchPortPerPortBaseEntity(SensorEntity):
             model_bits.append(port_info["if_descr"])
         model = " / ".join(model_bits) if model_bits else None
 
-        # Link a single-client edge port to the connected device via its MAC.
-        client_mac = (self._port_data() or {}).get("client_mac")
-        connections = (
-            {
-                (
-                    device_registry.CONNECTION_NETWORK_MAC,
-                    device_registry.format_mac(client_mac),
-                )
-            }
-            if client_mac
-            else set()
-        )
+        # Link an edge port to the device(s) on the other end via their MAC(s):
+        # the LLDP neighbour (an AP/switch) or the FDB-learned client(s).
+        connections = self._desired_mac_connections(self._port_data() or {})
 
         self._attr_device_info = DeviceInfo(
             identifiers={port_identifier},
@@ -1435,6 +1554,25 @@ class SwitchPortPerPortBaseEntity(SensorEntity):
         if not self.coordinator.data:
             return {}
         return self.coordinator.data.ports.get(self.port, {}) or {}
+
+    @staticmethod
+    def _desired_mac_connections(port_data: dict[str, Any]) -> set[tuple[str, str]]:
+        """The port's linkable MAC connections.
+
+        Prefers the LLDP/FDB link set (``link_macs``); falls back to the legacy
+        single ``client_mac`` when ``link_macs`` is absent (older coordinator
+        data or a test fixture). MACs are canonicalised via format_mac so the
+        registry matches them to the device carrying the same MAC.
+        """
+        macs = port_data.get("link_macs")
+        if macs is None:
+            client_mac = port_data.get("client_mac")
+            macs = [client_mac] if client_mac else []
+        return {
+            (device_registry.CONNECTION_NETWORK_MAC, device_registry.format_mac(m))
+            for m in macs
+            if m
+        }
 
     @property
     def available(self) -> bool:
@@ -1481,26 +1619,26 @@ class SwitchPortPerPortBaseEntity(SensorEntity):
                 new_name = f"{switch_label} / Port {self.port} ({port_name})"
             if device_entry.name != new_name:
                 dev_reg.async_update_device(device_entry.id, name=new_name)
-            # Reconcile the port's client-MAC link to exactly the current single
-            # client: add the new MAC and prune any previously-stamped one, so a
-            # port that saw a different client before is not left linked to every
-            # host ever seen on it. Cross-entry shared MACs link without colliding;
-            # finding-5 dedup keeps a MAC on one port, avoiding same-entry clashes.
-            client_mac = self._port_data().get("client_mac")
-            desired = device_registry.format_mac(client_mac) if client_mac else None
+            # Reconcile the port's MAC links to exactly the current link set (the
+            # LLDP neighbour, or the FDB client(s)): add the current MACs and
+            # prune any previously-stamped one, so a port that saw a different
+            # neighbour/client before is not left linked to every host ever seen
+            # on it. Cross-entry shared MACs link without colliding; the
+            # one-port-per-MAC dedup keeps a MAC on one port, avoiding same-entry
+            # clashes. Non-MAC connections are preserved untouched.
+            desired = self._desired_mac_connections(self._port_data())
             current = {
-                v
+                (t, v)
                 for t, v in device_entry.connections
                 if t == device_registry.CONNECTION_NETWORK_MAC
             }
-            if current != ({desired} if desired else set()):
+            if current != desired:
                 kept = {
                     (t, v)
                     for t, v in device_entry.connections
                     if t != device_registry.CONNECTION_NETWORK_MAC
                 }
-                if desired:
-                    kept.add((device_registry.CONNECTION_NETWORK_MAC, desired))
+                kept |= desired
                 dev_reg.async_update_device(device_entry.id, new_connections=kept)
         except HomeAssistantError as err:
             _LOGGER.debug(

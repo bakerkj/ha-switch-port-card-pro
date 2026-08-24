@@ -21,15 +21,18 @@ from puresnmp.exc import SnmpError
 
 from .const import (
     CONF_COMMUNITY,
+    CONF_ENABLE_PORT_LLDP_LINK,
     CONF_ENABLE_PORT_MAC_LINK,
     CONF_FAST_UPDATE_INTERVAL,
     CONF_HOST,
     CONF_INCLUDE_VLANS,
+    CONF_MAX_CLIENTS_TO_LINK,
     CONF_PORTS,
     CONF_PRIORITY_PORTS,
     CONF_RECORD_DECIMATION,
     CONF_SNMP_PORT,
     DEFAULT_BASE_OIDS,
+    DEFAULT_MAX_CLIENTS_TO_LINK,
     DEFAULT_RECORD_DECIMATION,
     DEFAULT_SNMP_PORT,
     DEFAULT_SYSTEM_OIDS,
@@ -411,6 +414,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator.manufacturer = manufacturer
     coordinator.enable_port_mac_link = entry.options.get(
         CONF_ENABLE_PORT_MAC_LINK, True
+    )
+    coordinator.enable_port_lldp_link = entry.options.get(
+        CONF_ENABLE_PORT_LLDP_LINK, True
+    )
+    coordinator.max_clients_to_link = int(
+        entry.options.get(CONF_MAX_CLIENTS_TO_LINK, DEFAULT_MAX_CLIENTS_TO_LINK)
     )
     coordinator.config_entry = entry
     coordinator.update_interval = timedelta(seconds=fast_update_seconds)
