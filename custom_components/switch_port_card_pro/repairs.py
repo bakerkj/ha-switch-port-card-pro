@@ -48,8 +48,9 @@ class PortDownRepairFlow(RepairsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         mgr = self._manager()
-        if mgr is not None:
-            await mgr.async_disable_port(self._data.get("port"))
+        port = self._data.get("port")
+        if mgr is not None and port is not None:
+            await mgr.async_disable_port(port)
         return self.async_create_entry(title="", data={})
 
     async def async_step_disable_all(
@@ -64,16 +65,18 @@ class PortDownRepairFlow(RepairsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         mgr = self._manager()
-        if mgr is not None:
-            await mgr.async_ignore_port(self._data.get("port"))
+        port = self._data.get("port")
+        if mgr is not None and port is not None:
+            await mgr.async_ignore_port(port)
         return self.async_create_entry(title="", data={})
 
     async def async_step_allow_flap(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         mgr = self._manager()
-        if mgr is not None:
-            await mgr.async_allow_flap(self._data.get("port"))
+        port = self._data.get("port")
+        if mgr is not None and port is not None:
+            await mgr.async_allow_flap(port)
         return self.async_create_entry(title="", data={})
 
 

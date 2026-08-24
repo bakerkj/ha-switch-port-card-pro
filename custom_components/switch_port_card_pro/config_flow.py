@@ -7,13 +7,13 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import selector
 
@@ -83,7 +83,7 @@ class SwitchPortCardProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Initial setup step."""
         errors: dict[str, str] = {}
 
@@ -166,7 +166,7 @@ class SwitchPortCardProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Allow changing host, community string, or SNMP port without re-adding."""
         errors: dict[str, str] = {}
         entry = self._get_reconfigure_entry()
@@ -215,7 +215,9 @@ class SwitchPortCardProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: ConfigEntry):
+    def async_get_options_flow(
+        config_entry: ConfigEntry,
+    ) -> SwitchPortCardProOptionsFlow:
         """Return options flow."""
         return SwitchPortCardProOptionsFlow(config_entry)
 
@@ -230,13 +232,13 @@ class SwitchPortCardProOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Manage the options."""
         return await self.async_step_options(user_input)
 
     async def async_step_options(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle options."""
         current = self.config_entry.options
 
@@ -299,7 +301,11 @@ class SwitchPortCardProOptionsFlow(config_entries.OptionsFlow):
             data_schema=self._build_schema(current),
         )
 
-    def _build_schema(self, current: dict, overrides: dict | None = None) -> vol.Schema:
+    def _build_schema(
+        self,
+        current: Mapping[str, Any],
+        overrides: Mapping[str, Any] | None = None,
+    ) -> vol.Schema:
         """Build the options schema, optionally pre-filling fields from overrides."""
         # Local import: the per-port sensor catalog lives in the sensor
         # platform and is the single source of truth for keys/labels/defaults.

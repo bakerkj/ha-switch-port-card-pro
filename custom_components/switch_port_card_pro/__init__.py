@@ -11,6 +11,7 @@ import logging
 import os
 import shutil
 from datetime import timedelta
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
@@ -50,10 +51,10 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 
-async def async_install_frontend_resource(hass: HomeAssistant):
+async def async_install_frontend_resource(hass: HomeAssistant) -> None:
     """Ensure the frontend JS file is copied to the www/community folder."""
 
-    def install():
+    def install() -> None:
         # Source path: custom_components/switch_port_card_pro/frontend/switch-port-card-pro.js
         source_path = hass.config.path(
             "custom_components", DOMAIN, "frontend", "switch-port-card-pro.js"
@@ -86,7 +87,7 @@ async def async_install_frontend_resource(hass: HomeAssistant):
     await hass.async_add_executor_job(install)
 
 
-async def async_register_card(hass: HomeAssistant, entry: ConfigEntry):
+async def async_register_card(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Register the custom card as a Lovelace resource."""
     lovelace_data = hass.data.get("lovelace")
     if not lovelace_data:
@@ -434,13 +435,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-def _summarize_port_speeds(detected: dict) -> str:
+def _summarize_port_speeds(detected: dict[int, dict[str, Any]]) -> str:
     """
     Summarize port speeds for logging.
 
     Example output: "8×1000Mbps, 2×10000Mbps"
     """
-    speed_counts = {}
+    speed_counts: dict[int, int] = {}
     for port_info in detected.values():
         speed = port_info.get("speed_mbps", 0)
         if speed > 0:
@@ -454,13 +455,13 @@ def _summarize_port_speeds(detected: dict) -> str:
     return ", ".join(parts)
 
 
-def _get_detection_summary(detected: dict) -> str:
+def _get_detection_summary(detected: dict[int, dict[str, Any]]) -> str:
     """
     Get summary of detection methods used.
 
     Example output: "8 by name, 2 by type"
     """
-    method_counts = {}
+    method_counts: dict[str, int] = {}
     for port_info in detected.values():
         method = port_info.get("detection", "unknown")
         method_counts[method] = method_counts.get(method, 0) + 1
