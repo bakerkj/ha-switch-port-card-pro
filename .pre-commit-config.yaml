@@ -61,9 +61,11 @@ repos:
   - repo: https://github.com/Lucas-C/pre-commit-hooks
     rev: v1.5.6
     hooks:
+      # Derived-from-upstream files (the integration + card) carry both
+      # copyrights; our own new files (tests, tooling) carry only ours.
       - id: insert-license
-        name: Ensure Python copyright header
-        files: \.py$
+        name: Copyright header (derived integration .py)
+        files: ^custom_components/switch_port_card_pro/.*\.py$
         args:
           - --license-filepath
           - .copyright-header.txt
@@ -71,14 +73,23 @@ repos:
           - "#"
           - --detect-license-in-X-top-lines=8
       - id: insert-license
-        name: Ensure JS copyright header
-        files: \.js$
+        name: Copyright header (derived card .js)
+        files: ^custom_components/switch_port_card_pro/.*\.js$
         exclude: \.min\.js$
         args:
           - --license-filepath
           - .copyright-header.txt
           - --comment-style
           - //
+          - --detect-license-in-X-top-lines=8
+      - id: insert-license
+        name: Copyright header (our .py)
+        files: ^tests/.*\.py$
+        args:
+          - --license-filepath
+          - .copyright-header-new.txt
+          - --comment-style
+          - "#"
           - --detect-license-in-X-top-lines=8
 
   - repo: https://github.com/rhysd/actionlint
