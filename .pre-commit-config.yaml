@@ -47,7 +47,7 @@ repos:
             "--ignore-words-list",
             "hass",
             "--skip",
-            "uv.lock,*.min.js,custom_components/switch_port_card_pro/frontend/*,custom_components/switch_port_card_pro/translations/*",
+            "uv.lock,*.min.js,custom_components/switch_port_card_pro/frontend/*",
           ]
 
   - repo: https://github.com/rbubley/mirrors-prettier
