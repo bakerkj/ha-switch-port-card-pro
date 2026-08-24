@@ -2,17 +2,17 @@
   "domain": "switch_port_card_pro",
   "name": "Switch Port Card Pro",
   "codeowners": [
-    "@partach"
+    "@bakerkj"
   ],
   "config_flow": true,
   "dependencies": [
     "lovelace",
     "frontend"
   ],
-  "documentation": "https://github.com/partach/switch_port_card_pro",
+  "documentation": "https://github.com/bakerkj/ha-switch-port-card-pro",
   "integration_type": "hub",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/partach/switch_port_card_pro/issues",
+  "issue_tracker": "https://github.com/bakerkj/ha-switch-port-card-pro/issues",
   "requirements": [
     "puresnmp>=2.0.0"
   ],
