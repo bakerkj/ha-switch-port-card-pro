@@ -1,5 +1,4 @@
-# Copyright (c) 2025 partach (original switch_port_card_pro)
-# Copyright (c) 2026 Kenneth Baker <bakerkj@umich.edu> (modifications)
+# Copyright (c) 2026 Kenneth Baker <bakerkj@umich.edu>
 # SPDX-License-Identifier: MIT
 
 """Tests for :mod:`custom_components.switch_port_card_pro.repairs`.
