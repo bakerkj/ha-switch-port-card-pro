@@ -61,33 +61,35 @@ repos:
   - repo: https://github.com/Lucas-C/pre-commit-hooks
     rev: v1.5.6
     hooks:
-      # Derived-from-upstream files (the integration + card) carry both
-      # copyrights; our own new files (tests, tooling) carry only ours.
+      # The exact files derived from partach's upstream carry the combined
+      # notice (.copyright-header-old.txt). Everything else — including any NEW
+      # file we add under custom_components/ — defaults to our own header, so a
+      # future file never silently inherits partach's copyright.
       - id: insert-license
-        name: Copyright header (derived integration .py)
-        files: ^custom_components/switch_port_card_pro/.*\.py$
+        name: Copyright header (original)
+        files: ^custom_components/switch_port_card_pro/(__init__|config_flow|const|sensor|snmp_helper)\.py$
         args:
           - --license-filepath
-          - .copyright-header.txt
+          - .copyright-header-old.txt
           - --comment-style
           - "#"
           - --detect-license-in-X-top-lines=8
       - id: insert-license
-        name: Copyright header (derived card .js)
-        files: ^custom_components/switch_port_card_pro/.*\.js$
-        exclude: \.min\.js$
+        name: Copyright header (original)
+        files: ^custom_components/switch_port_card_pro/frontend/switch-port-card-pro\.js$
         args:
           - --license-filepath
-          - .copyright-header.txt
+          - .copyright-header-old.txt
           - --comment-style
           - //
           - --detect-license-in-X-top-lines=8
       - id: insert-license
-        name: Copyright header (our .py)
-        files: ^tests/.*\.py$
+        name: Copyright header
+        files: \.py$
+        exclude: ^custom_components/switch_port_card_pro/(__init__|config_flow|const|sensor|snmp_helper)\.py$
         args:
           - --license-filepath
-          - .copyright-header-new.txt
+          - .copyright-header.txt
           - --comment-style
           - "#"
           - --detect-license-in-X-top-lines=8
