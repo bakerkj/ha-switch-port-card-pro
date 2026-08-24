@@ -22,10 +22,12 @@ from .const import (
     CONF_COMMUNITY,
     CONF_DEFAULT_ENABLED_SENSORS,
     CONF_DOWN_GRACE_HOURS,
+    CONF_ENABLE_PORT_LLDP_LINK,
     CONF_ENABLE_PORT_MAC_LINK,
     CONF_FAST_UPDATE_INTERVAL,
     CONF_HOST,
     CONF_INCLUDE_VLANS,
+    CONF_MAX_CLIENTS_TO_LINK,
     CONF_OID_SYSNAME,
     CONF_PORTS,
     CONF_PRIORITY_PORTS,
@@ -35,6 +37,7 @@ from .const import (
     DEFAULT_AUTO_MANAGE_ENTITIES,
     DEFAULT_BASE_OIDS,
     DEFAULT_DOWN_GRACE_HOURS,
+    DEFAULT_MAX_CLIENTS_TO_LINK,
     DEFAULT_PORTS,
     DEFAULT_RECORD_DECIMATION,
     DEFAULT_SNMP_PORT,
@@ -360,6 +363,16 @@ class SwitchPortCardProOptionsFlow(config_entries.OptionsFlow):
                     CONF_ENABLE_PORT_MAC_LINK,
                     default=src.get(CONF_ENABLE_PORT_MAC_LINK, True),
                 ): cv.boolean,
+                vol.Optional(
+                    CONF_ENABLE_PORT_LLDP_LINK,
+                    default=src.get(CONF_ENABLE_PORT_LLDP_LINK, True),
+                ): cv.boolean,
+                vol.Optional(
+                    CONF_MAX_CLIENTS_TO_LINK,
+                    default=src.get(
+                        CONF_MAX_CLIENTS_TO_LINK, DEFAULT_MAX_CLIENTS_TO_LINK
+                    ),
+                ): _int_box(1, 100),
                 # Which per-port sensors are enabled by default. Applies to
                 # newly-created entities only (new installs / added ports);
                 # existing entities keep whatever state they already have.

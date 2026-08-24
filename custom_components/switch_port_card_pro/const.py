@@ -18,6 +18,22 @@ CONF_FAST_UPDATE_INTERVAL: Final = "fast_update_interval"
 CONF_INCLUDE_VLANS: Final = "include_vlans"
 # Link single-client ports to their connected device via the FDB-learned MAC.
 CONF_ENABLE_PORT_MAC_LINK: Final = "enable_port_mac_link"
+# Link a port to the AP/switch on the other end via its LLDP neighbour's chassis
+# MAC. Preferred over the FDB: one stable neighbour per port, immune to the
+# "uplink briefly drops to a single client" flap that would misroute FDB links.
+CONF_ENABLE_PORT_LLDP_LINK: Final = "enable_port_lldp_link"
+# FDB fallback ceiling: a port with no LLDP neighbour links its learned clients
+# only when it has at most this many (1 = today's single-client behaviour).
+CONF_MAX_CLIENTS_TO_LINK: Final = "max_clients_to_link"
+DEFAULT_MAX_CLIENTS_TO_LINK: Final = 1
+# LLDP-MIB (IEEE 802.1AB) OIDs.
+# lldpRemChassisId: idx = timeMark.lldpLocPortNum.lldpRemIndex; value = neighbour
+# chassis id (a 6-octet MAC when lldpChassisIdSubtype = macAddress(4)).
+OID_LLDP_REM_CHASSIS_ID: Final = "1.0.8802.1.1.2.1.4.1.1.5"
+# lldpLocChassisId: scalar; this switch's own chassis id (its base MAC), which
+# neighbours learn and stamp on their port devices — publish it so those links
+# resolve back to this switch's device.
+OID_LLDP_LOC_CHASSIS_ID: Final = "1.0.8802.1.1.2.1.3.2"
 CONF_SFP_PORTS_START = "sfp_ports_start"
 
 # Per-port attribute sensors a user wants enabled by default. Stored as a
