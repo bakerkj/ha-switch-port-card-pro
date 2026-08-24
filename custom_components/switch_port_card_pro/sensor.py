@@ -13,7 +13,7 @@ import zlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -28,14 +28,16 @@ from homeassistant.const import (
     UnitOfTime,
 )
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
 from homeassistant.util import dt as dt_util
+from puresnmp.exc import SnmpError
 
 from .const import (
     CONF_DEFAULT_ENABLED_SENSORS,
@@ -72,6 +74,9 @@ from .snmp_helper import (
     async_snmp_walk,
 )
 
+if TYPE_CHECKING:
+    from .entity_manager import PortEntityManager
+
 _LOGGER = logging.getLogger(__name__)
 
 # Tolerance for boot-time drift before we treat sysUpTime as a real reboot
@@ -93,7 +98,7 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
         hass: HomeAssistant,
         host: str,
         community: str,
-        snmp_port,
+        snmp_port: int,
         ports: list[int],
         base_oids: dict[str, str],
         system_oids: dict[str, str],
@@ -119,10 +124,15 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
         self.system_oids = system_oids
         self.include_vlans = include_vlans
         self.mp_model = SNMP_VERSION_TO_MP_MODEL.get(snmp_version, 1)
-        self.port_mapping = {}
+        self.port_mapping: dict[int, dict[str, Any]] = {}
         self.update_seconds = update_seconds
         self.fast_update_seconds = fast_seconds
         self.priority_ports = [p for p in (priority_ports or []) if p in ports]
+        # Populated by async_setup_entry after construction.
+        self.device_name: str | None = None
+        self.manufacturer: str = "Unknown"
+        self.enable_port_mac_link: bool = True
+        self.entity_manager: PortEntityManager | None = None
         # How many fast ticks make up one slow tick. 1 means feature is effectively off.
         self._slow_every = (
             max(1, round(update_seconds / fast_seconds))
@@ -172,7 +182,7 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
             return True
         return self._poll_cycle % span == zlib.crc32(key.encode()) % span
 
-    def _resolve_boot_time(self, sys_uptime_ticks: int | None):
+    def _resolve_boot_time(self, sys_uptime_ticks: int | None) -> Any:
         """Stable datetime the switch came online.
 
         Recomputed only when sysUpTime resets (reboot) or the candidate
@@ -198,7 +208,7 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
         if_index: int,
         sys_uptime_ticks: int | None,
         last_change_map: dict[int, Any],
-    ):
+    ) -> Any:
         """Absolute datetime of the port's last state change (stable)."""
         ticks = last_change_map.get(if_index)
         if ticks is None or sys_uptime_ticks is None:
@@ -225,11 +235,11 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
         if not do_full:
             try:
                 return await self._fast_update()
-            except Exception as err:
+            except SnmpError, OSError:
                 _LOGGER.debug(
-                    "Fast priority-port update failed on %s, falling back to full poll: %s",
+                    "Fast priority-port update failed on %s, falling back to full poll",
                     self.host,
-                    err,
+                    exc_info=True,
                 )
         return await self._full_update()
 
@@ -374,7 +384,7 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
                     #     _LOGGER.warning("SNMP walk empty for %s → using defaults", key) # suppress unneeded log
                     walk_map[key] = {}
                 else:
-                    walk_map[key] = result
+                    walk_map[key] = cast("dict[str, str]", result)
 
             # HP PoE auto-detection: fill in missing PoE walk results when OIDs are not manually configured.
             manufacturer = getattr(self, "manufacturer", "").lower()
@@ -406,7 +416,7 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
                     )
                     for key, result in zip(hp_poe_keys, hp_poe_results):
                         walk_map[key] = (
-                            result
+                            cast("dict[str, str]", result)
                             if not isinstance(result, Exception) and result
                             else {}
                         )
@@ -438,25 +448,45 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
 
             rx = parse(walk_map.get("rx", {}))
             tx = parse(walk_map.get("tx", {}))
-            hc_rx = parse(hc_rx_raw if not isinstance(hc_rx_raw, Exception) else {})
-            hc_tx = parse(hc_tx_raw if not isinstance(hc_tx_raw, Exception) else {})
+            hc_rx = parse(
+                cast("dict[str, str]", hc_rx_raw)
+                if not isinstance(hc_rx_raw, Exception)
+                else {}
+            )
+            hc_tx = parse(
+                cast("dict[str, str]", hc_tx_raw)
+                if not isinstance(hc_tx_raw, Exception)
+                else {}
+            )
             in_errors = parse(
-                in_errors_raw if not isinstance(in_errors_raw, Exception) else {}
+                cast("dict[str, str]", in_errors_raw)
+                if not isinstance(in_errors_raw, Exception)
+                else {}
             )
             out_errors = parse(
-                out_errors_raw if not isinstance(out_errors_raw, Exception) else {}
+                cast("dict[str, str]", out_errors_raw)
+                if not isinstance(out_errors_raw, Exception)
+                else {}
             )
             in_discards = parse(
-                in_discards_raw if not isinstance(in_discards_raw, Exception) else {}
+                cast("dict[str, str]", in_discards_raw)
+                if not isinstance(in_discards_raw, Exception)
+                else {}
             )
             out_discards = parse(
-                out_discards_raw if not isinstance(out_discards_raw, Exception) else {}
+                cast("dict[str, str]", out_discards_raw)
+                if not isinstance(out_discards_raw, Exception)
+                else {}
             )
             admin_status = parse(
-                admin_status_raw if not isinstance(admin_status_raw, Exception) else {}
+                cast("dict[str, str]", admin_status_raw)
+                if not isinstance(admin_status_raw, Exception)
+                else {}
             )
             last_change = parse(
-                last_change_raw if not isinstance(last_change_raw, Exception) else {}
+                cast("dict[str, str]", last_change_raw)
+                if not isinstance(last_change_raw, Exception)
+                else {}
             )
             # sysUpTime for computing time-since-last-change
             sys_uptime_raw = await async_snmp_get(
@@ -478,7 +508,9 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
             # ifHighSpeed (Mbps) — preferred over ifSpeed for 10G+ links, which
             # overflow ifSpeed's 32-bit bps gauge (ceilings at ~4.29 Gbps).
             high_speed = parse(
-                high_speed_raw if not isinstance(high_speed_raw, Exception) else {}
+                cast("dict[str, str]", high_speed_raw)
+                if not isinstance(high_speed_raw, Exception)
+                else {}
             )
             name = parse(walk_map.get("name", {}), int_val=False)
             vlan = parse(walk_map.get("vlan", {}))
@@ -499,7 +531,7 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
                     return byte_index < len(bitmap_bytes) and bool(
                         (bitmap_bytes[byte_index] >> bit_index) & 1
                     )
-                except Exception:
+                except ValueError, IndexError, TypeError:
                     return False
 
             # Build if_index → bridge_port mapping and fetch per-VLAN egress bitmaps in parallel.
@@ -693,7 +725,7 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
                             "poe_class": poe_class_data.get(if_index),
                             "port_custom": port_custom.get(if_index, 0),
                             "admin_status": {1: "up", 2: "down"}.get(
-                                admin_status.get(if_index)
+                                cast("int", admin_status.get(if_index))
                             ),
                             "in_errors": in_errors.get(if_index, 0),
                             "out_errors": out_errors.get(if_index, 0),
@@ -831,7 +863,7 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
             memory_total_raw = get("memory_total")
             if memory_raw is not None and memory_total_raw is not None:
                 try:
-                    memory_value = (
+                    memory_value: float | str | None = (
                         round(float(memory_raw) / float(memory_total_raw) * 100, 1)
                         if float(memory_total_raw) > 0
                         else None
@@ -970,7 +1002,7 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
                 return_exceptions=True,
             )
 
-            def _first_int(raw) -> int | None:
+            def _first_int(raw: Any) -> int | None:
                 if isinstance(raw, Exception) or not raw:
                     return None
                 for v in raw.values():
@@ -983,7 +1015,7 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
             system["poe_budget_watts"] = _first_int(poe_budget_raw)
 
             # Parse ENTITY-SENSOR-MIB walks: OID suffix is the entity index
-            def _ent_parse(raw) -> dict[int, str]:
+            def _ent_parse(raw: Any) -> dict[int, str]:
                 if isinstance(raw, Exception) or not raw:
                     return {}
                 out = {}
@@ -1150,6 +1182,11 @@ class SwitchPortBaseEntity(SensorEntity):
     _attr_has_entity_name = True
     _attr_should_poll = False
 
+    # Set in async_added_to_hass; declared here so mypy knows they may be
+    # absent/None (the hasattr + truthy guards below rely on that).
+    _unsub_coordinator: Callable[[], None] | None
+    _unsub_devinfo: Callable[[], None] | None
+
     def __init__(self, coordinator: SwitchPortCoordinator, entry_id: str) -> None:
         self.coordinator = coordinator
         self.entry_id = entry_id
@@ -1173,8 +1210,9 @@ class SwitchPortBaseEntity(SensorEntity):
                 self.coordinator.last_update_success
                 and self.coordinator.data is not None
             )
-        except Exception:
+        except AttributeError:
             _LOGGER.error("Entity not available")
+            return False
 
     async def async_will_remove_from_hass(self) -> None:
         if hasattr(self, "_unsub_coordinator") and self._unsub_coordinator:
@@ -1217,10 +1255,8 @@ class SwitchPortBaseEntity(SensorEntity):
                         model=model,
                         sw_version=firmware,
                     )
-            except Exception as err:
-                _LOGGER.error(
-                    "Entity update failed for %s with error %s", self.host, err
-                )
+            except SnmpError, OSError:
+                _LOGGER.exception("Entity update failed for %s", self.coordinator.host)
 
         # Run on each coordinator update
         self._unsub_devinfo = self.coordinator.async_add_listener(_update_device_info)
@@ -1466,7 +1502,7 @@ class SwitchPortPerPortBaseEntity(SensorEntity):
                 if desired:
                     kept.add((device_registry.CONNECTION_NETWORK_MAC, desired))
                 dev_reg.async_update_device(device_entry.id, new_connections=kept)
-        except Exception as err:
+        except HomeAssistantError as err:
             _LOGGER.debug(
                 "Port device update failed for %s port %s: %s",
                 self.coordinator.host,
@@ -1594,7 +1630,7 @@ class PortSensorDescription:
 
     key: str
     name: str
-    value_fn: Callable[[PortStatusSensor, dict[str, Any]], Any]
+    value_fn: Callable[[SwitchPortPerPortBaseEntity, dict[str, Any]], Any]
     unit: str | None = None
     device_class: SensorDeviceClass | None = None
     state_class: SensorStateClass | None = None
@@ -1605,16 +1641,16 @@ class PortSensorDescription:
     suggested_display_precision: int | None = None
 
 
-def _poe_power_watts(_e, p):
+def _poe_power_watts(_e: SwitchPortPerPortBaseEntity, p: dict[str, Any]) -> float:
     raw = p.get("poe_power")
     return round(raw / 1000.0, 2) if raw else 0.0
 
 
-def _admin_status_value(_e, p):
+def _admin_status_value(_e: SwitchPortPerPortBaseEntity, p: dict[str, Any]) -> Any:
     return p.get("admin_status")
 
 
-def _link_speed_mbps(_e, p):
+def _link_speed_mbps(_e: SwitchPortPerPortBaseEntity, p: dict[str, Any]) -> int:
     sp = p.get("speed") or 0
     # Coordinator already converts <100000 (treated as Mbps) to bps. Convert to Mbps for display.
     return int(sp / 1_000_000) if sp else 0
@@ -1802,12 +1838,12 @@ class PortAttributeSensor(SwitchPortPerPortBaseEntity):
             return None
         try:
             return self._description.value_fn(self, p)
-        except Exception as err:
+        except ValueError, TypeError, KeyError, AttributeError, IndexError:
             _LOGGER.debug(
-                "value_fn failed for port %s/%s: %s",
+                "value_fn failed for port %s/%s",
                 self.port,
                 self._description.key,
-                err,
+                exc_info=True,
             )
             return None
 
@@ -1844,12 +1880,12 @@ class CustomValueSensor(SwitchPortBaseEntity):
     _attr_name = "Custom Value"
     _attr_icon = "mdi:text-box-search"
 
-    def __init__(self, coordinator, entry_id):
+    def __init__(self, coordinator: SwitchPortCoordinator, entry_id: str) -> None:
         super().__init__(coordinator, entry_id)
         self._attr_unique_id = f"{entry_id}_custom_value"
 
     @property
-    def native_value(self):
+    def native_value(self) -> Any:
         """Return the custom OID value safely."""
         if not self.coordinator.data:
             return ""
@@ -1929,7 +1965,7 @@ class SystemStartTimeSensor(SwitchPortBaseEntity):
         self._attr_unique_id = f"{entry_id}_{self._attr_unique_id_suffix}"
 
     @property
-    def native_value(self):
+    def native_value(self) -> Any:
         if not self.coordinator.data:
             return None
         return self.coordinator.data.system.get("boot_time")
@@ -2023,7 +2059,7 @@ async def async_setup_entry(
     """Set up the platform from config_entry. vlans override always to true"""
     coordinator = hass.data[DOMAIN][entry.entry_id]
     # Create entities
-    entities = [
+    entities: list[SensorEntity] = [
         BandwidthSensor(coordinator, entry.entry_id),
         TotalPoESensor(coordinator, entry.entry_id),
         PoEBudgetTotalSensor(coordinator, entry.entry_id),

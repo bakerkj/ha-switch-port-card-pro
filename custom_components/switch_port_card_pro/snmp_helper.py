@@ -16,11 +16,15 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from collections.abc import Awaitable, Callable
 from functools import partial
-from typing import Any
+from typing import Any, cast
 
+from homeassistant.core import HomeAssistant
 from puresnmp import V1, V2C, Client
-from puresnmp.transport import send_udp
+from puresnmp.credentials import Credentials
+from puresnmp.exc import SnmpError
+from puresnmp.transport import TSender, send_udp
 from x690.types import ObjectIdentifier, OctetString
 
 from .const import (
@@ -202,7 +206,11 @@ def _prewarm_plugins() -> None:
         "puresnmp_plugins.mpm", _mpm.is_valid_mpm_plugin
     )
 
-    def _cached_mpm_create(identifier, transport_handler, lcd):
+    def _cached_mpm_create(
+        identifier: int,
+        transport_handler: Callable[[bytes], Awaitable[bytes]],
+        lcd: dict[str, Any],
+    ) -> Any:
         result = _mpm_loader.create(identifier)
         if result is None:
             raise UnknownMessageProcessingModel(
@@ -210,16 +218,16 @@ def _prewarm_plugins() -> None:
                 identifier,
                 sorted(_mpm_loader.discovered_plugins.keys()),
             )
-        return result.create(transport_handler, lcd)  # type: ignore
+        return result.create(transport_handler, lcd)
 
-    _mpm.create = _cached_mpm_create  # type: ignore[assignment]
+    _mpm.create = _cached_mpm_create
 
     _sec_loader = Loader("puresnmp_plugins.security", _sec.is_valid_sec_plugin)
     _sec_loader.discovered_plugins = discover_plugins(
         "puresnmp_plugins.security", _sec.is_valid_sec_plugin
     )
 
-    def _cached_sec_create(identifier):
+    def _cached_sec_create(identifier: int) -> Any:
         result = _sec_loader.create(identifier)
         if result is None:
             raise UnknownSecurityModel(
@@ -227,9 +235,9 @@ def _prewarm_plugins() -> None:
                 identifier,
                 sorted(_sec_loader.discovered_plugins.keys()),
             )
-        return result.create()  # type: ignore
+        return result.create()
 
-    _sec.create = _cached_sec_create  # type: ignore[assignment]
+    _sec.create = _cached_sec_create
 
     # The mpm plugin modules captured security.create at import time via
     # ``from puresnmp.plugins.security import create as create_sm``. Patching
@@ -237,11 +245,11 @@ def _prewarm_plugins() -> None:
     import puresnmp_plugins.mpm.v1 as _v1
     import puresnmp_plugins.mpm.v2c as _v2c
 
-    _v1.create_sm = _cached_sec_create  # type: ignore[attr-defined]
-    _v2c.create_sm = _cached_sec_create  # type: ignore[attr-defined]
+    _v1.create_sm = _cached_sec_create
+    _v2c.create_sm = _cached_sec_create
 
 
-async def async_prewarm_plugins(hass) -> None:
+async def async_prewarm_plugins(hass: HomeAssistant) -> None:
     """Run plugin pre-warm exactly once per process lifetime."""
     global _PLUGINS_PREWARMED
     if _PLUGINS_PREWARMED:
@@ -255,17 +263,17 @@ async def async_prewarm_plugins(hass) -> None:
 
 
 # ── Credentials / transport helpers ──────────────────────────────────────────
-def _credentials(mp_model: int, community: str):
+def _credentials(mp_model: int, community: str) -> Credentials:
     """Return puresnmp credentials for the given SNMP mpModel (0=v1, 1=v2c)."""
     return V1(community) if mp_model == 0 else V2C(community)
 
 
-def _make_sender(timeout: int, retries: int):
+def _make_sender(timeout: int, retries: int) -> TSender:
     """Return a puresnmp sender with custom timeout and retry settings."""
     return partial(send_udp, timeout=timeout, retries=retries)
 
 
-def _value_to_str(value) -> str:
+def _value_to_str(value: Any) -> str:
     """Convert a puresnmp value to a string.
 
     Matches the format pysnmp prettyPrint() produced so existing parsers
@@ -292,7 +300,7 @@ def _value_to_str(value) -> str:
 
 
 async def async_snmp_get(
-    hass,
+    hass: HomeAssistant,
     host: str,
     community: str,
     snmp_port: int,
@@ -318,13 +326,13 @@ async def async_snmp_get(
         return _value_to_str(value)
     except asyncio.CancelledError:
         raise
-    except Exception as exc:
-        _LOGGER.debug("SNMP GET failed on %s (oid=%s): %s", host, oid, exc)
+    except SnmpError, OSError:
+        _LOGGER.debug("SNMP GET failed on %s (oid=%s)", host, oid, exc_info=True)
         return None
 
 
 async def async_snmp_walk(
-    hass,
+    hass: HomeAssistant,
     host: str,
     community: str,
     snmp_port: int,
@@ -353,7 +361,7 @@ async def async_snmp_walk(
         )
         oid_obj = ObjectIdentifier(base)
         walker = (
-            client.walk([oid_obj])
+            client.walk(oid_obj)
             if mp_model == 0
             else client.bulkwalk([oid_obj], bulk_size=25)
         )
@@ -364,13 +372,13 @@ async def async_snmp_walk(
             results[oid_str] = _value_to_str(vb.value)
     except asyncio.CancelledError:
         raise
-    except Exception as exc:
-        _LOGGER.debug("SNMP WALK failed on %s (%s): %s", host, base, exc)
+    except SnmpError, OSError:
+        _LOGGER.debug("SNMP WALK failed on %s (%s)", host, base, exc_info=True)
     return results
 
 
 async def async_snmp_bulk(
-    hass,
+    hass: HomeAssistant,
     host: str,
     community: str,
     snmp_port: int,
@@ -384,8 +392,8 @@ async def async_snmp_bulk(
         return {}
 
     # Filter out empty or whitespace-only OIDs
-    filtered_oids = []
-    results_template = {}
+    filtered_oids: list[str] = []
+    results_template: dict[str, str | None] = {}
     for oid in oid_list:
         stripped = oid.strip() if oid else ""
         if stripped:
@@ -398,7 +406,7 @@ async def async_snmp_bulk(
         return results_template
 
     # Perform parallel GET only on valid OIDs
-    async def _get_one(oid: str):
+    async def _get_one(oid: str) -> str | None:
         return await async_snmp_get(
             hass,
             host,
@@ -426,10 +434,10 @@ async def async_snmp_bulk(
 
 
 async def discover_physical_ports(
-    hass,
+    hass: HomeAssistant,
     host: str,
     community: str,
-    snmp_port,
+    snmp_port: int,
     mp_model: int = 1,
 ) -> dict[int, dict[str, Any]]:
     """
@@ -679,14 +687,12 @@ def _is_physical_interface(descr_lower: str, descr_clean: str, if_index: int) ->
 
     # Special case: single-digit descriptions
     if descr_clean.isdigit():
-        if if_index >= 1000:
-            return False
-        return True
+        return if_index < 1000
 
-    return is_likely_physical
+    return cast(bool, is_likely_physical)
 
 
-def _get_interface_type(type_data: dict, if_index: int) -> int:
+def _get_interface_type(type_data: dict[str, str], if_index: int) -> int:
     """Extract interface type from SNMP ifType data (IANAifType)."""
     for t_oid, t_val in type_data.items():
         if t_oid.endswith(f".{if_index}"):
@@ -708,9 +714,10 @@ def _detect_sfp_port(
     Only used when MAU-MIB data is unavailable.
     """
     # HP/Aruba: uplink ports named A1-A4 are SFP slots
-    if any(m in manufacturer.lower() for m in HP_MANUFACTURER_KEYWORDS):
-        if re.match(r"^[a-z]\d+$", descr_lower):
-            return True, "hp_uplink_name"
+    if any(m in manufacturer.lower() for m in HP_MANUFACTURER_KEYWORDS) and re.match(
+        r"^[a-z]\d+$", descr_lower
+    ):
+        return True, "hp_uplink_name"
 
     # Netgear 10G special case
     if "10g - level" in descr_lower:
@@ -762,7 +769,9 @@ def _detect_sfp_port(
     return False, "default_copper"
 
 
-def _get_port_speed(speed_data: dict, high_speed_data: dict, if_index: int) -> int:
+def _get_port_speed(
+    speed_data: dict[str, str], high_speed_data: dict[str, str], if_index: int
+) -> int:
     """Get port speed in Mbps."""
     # Try high-speed first (ifHighSpeed)
     raw_high = high_speed_data.get(f"{CONF_OID_IFHIGHSPEED}.{if_index}")

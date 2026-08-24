@@ -31,19 +31,14 @@ explicit_package_bases = true
 namespace_packages = true
 strict = true
 
-# The pytest-homeassistant-custom-component test plugin ships no py.typed; HA
-# core itself is fully typed, so this is the only relaxation tests need.
+# These libs ship no py.typed, so mypy cannot import their types. (puresnmp and
+# x690 ARE typed, so they are deliberately NOT listed — we use their real types.)
 [[tool.mypy.overrides]]
-module = "pytest_homeassistant_custom_component.*"
+module = [
+  "pytest_homeassistant_custom_component.*",
+  "puresnmp_plugins.*",
+]
 ignore_missing_imports = true
-
-# BOOTSTRAP: this integration was adopted from an untyped upstream fork, so the
-# inherited modules do not yet pass mypy --strict. Their type errors are not a CI
-# gate yet; remove this override (ideally module-by-module) as the code is
-# annotated. New code under tests/ is still checked strictly.
-[[tool.mypy.overrides]]
-module = "custom_components.switch_port_card_pro.*"
-ignore_errors = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -54,19 +49,6 @@ testpaths = ["tests"]
 [tool.ruff]
 target-version = "py314"
 line-length = 88
-
-# BOOTSTRAP: the inherited upstream integration trips a handful of lint rules
-# (broad excepts, if-merges, logging.exception preference). Relax them for the
-# inherited modules only — tests/ and any new code stay fully checked. Trim this
-# list as the upstream code is refactored.
-[tool.ruff.lint.per-file-ignores]
-"custom_components/switch_port_card_pro/*" = [
-  "BLE001",
-  "SIM102",
-  "SIM103",
-  "SIM118",
-  "TRY401",
-]
 
 [tool.coverage.run]
 source = ["custom_components/switch_port_card_pro"]

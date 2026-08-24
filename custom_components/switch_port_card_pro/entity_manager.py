@@ -100,7 +100,7 @@ class PortEntityManager:
         self.hass = hass
         self.entry = entry
         self.coordinator = coordinator
-        self._store: Store = Store(
+        self._store: Store[dict[str, dict[str, Any]]] = Store(
             hass, _STORE_VERSION, f"{DOMAIN}.{entry.entry_id}.entity_manager"
         )
         self._state: dict[str, dict[str, Any]] = {}  # port(str) -> state
