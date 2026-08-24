@@ -33,7 +33,7 @@ def test_format_mac_and_connection_constant() -> None:
 
 def test_device_info_has_connections() -> None:
     """Per-port DeviceInfo carries the client MAC in `connections`."""
-    from homeassistant.helpers.entity import DeviceInfo
+    from homeassistant.helpers.device_registry import DeviceInfo
 
     assert "connections" in DeviceInfo.__annotations__
 
