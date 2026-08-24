@@ -30,11 +30,12 @@ jobs:
           uv run --no-sync python -c "from homeassistant.const import
           __version__; print(__version__)"
 
-      # Coverage is reported but the gate starts low: this integration was
-      # adopted without a test suite, so tests (and this threshold) grow over
-      # time. Ratchet --cov-fail-under up as real coverage lands.
+      # Enforced coverage floor. Current suite covers ~39% (const/config_flow/
+      # entity_manager/snmp_helper well; the SNMP coordinator in sensor.py and
+      # setup in __init__.py are the remaining gaps). Ratchet this up as those
+      # land — never lower it.
       - name: Tests (with coverage gate)
         run: >-
           uv run --no-sync python -m pytest tests/
           --cov=custom_components/switch_port_card_pro --cov-report=term-missing
-          --cov-fail-under=0 --durations=10
+          --cov-fail-under=35 --durations=10
