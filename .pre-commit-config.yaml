@@ -68,7 +68,7 @@ repos:
         files: ^custom_components/switch_port_card_pro/.*\.py$
         args:
           - --license-filepath
-          - .copyright-header.txt
+          - .copyright-header-old.txt
           - --comment-style
           - "#"
           - --detect-license-in-X-top-lines=8
@@ -78,7 +78,7 @@ repos:
         exclude: \.min\.js$
         args:
           - --license-filepath
-          - .copyright-header.txt
+          - .copyright-header-old.txt
           - --comment-style
           - //
           - --detect-license-in-X-top-lines=8
@@ -87,7 +87,7 @@ repos:
         files: ^tests/.*\.py$
         args:
           - --license-filepath
-          - .copyright-header-new.txt
+          - .copyright-header.txt
           - --comment-style
           - "#"
           - --detect-license-in-X-top-lines=8
