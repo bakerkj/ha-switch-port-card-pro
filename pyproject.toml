@@ -1,6 +1,6 @@
 [project]
 name = "ha-switch-port-card-pro"
-version = "1.0.18" # x-release-please-version
+version = "1.1.0" # x-release-please-version
 description = "Home Assistant integration + Lovelace card for per-port switch monitoring over SNMP, with optional port-to-device MAC linking learned from the switch FDB."
 license = "MIT"
 requires-python = ">=3.14.2"

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.0.18...v1.1.0) (2026-08-24)
+
+
+### Features
+
+* link ports to their LLDP neighbour (AP/switch), FDB as fallback ([#12](https://github.com/bakerkj/ha-switch-port-card-pro/issues/12)) ([252b018](https://github.com/bakerkj/ha-switch-port-card-pro/commit/252b0188816b3a8ecf4a4114e45637416e68ad06))
+
 ## [1.0.18](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.0.17...v1.0.18) (2026-08-24)
 
 
