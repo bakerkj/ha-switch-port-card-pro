@@ -27,11 +27,15 @@ from homeassistant.const import (
     UnitOfTemperature,
     UnitOfTime,
 )
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry
-from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.device_registry import (
+    DeviceInfo,
+    EventDeviceRegistryUpdatedData,
+)
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.event import async_track_device_registry_updated_event
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
@@ -1293,7 +1297,225 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
 # =============================================================================
 # Entities
 # =============================================================================
-class SwitchPortBaseEntity(SensorEntity):
+def _devinfo_key(desired: dict[str, Any]) -> tuple[tuple[str, Any], ...]:
+    """A hashable, order-stable key for a desired-device-info spec.
+
+    Sets (MAC connection sets) are frozen to tuples so the whole spec can be
+    compared cheaply against the last-applied spec to decide whether any
+    registry work is needed this tick.
+    """
+    items: list[tuple[str, Any]] = []
+    for k in sorted(desired):
+        v = desired[k]
+        if isinstance(v, (set, frozenset)):
+            v = tuple(sorted(v))
+        items.append((k, v))
+    return tuple(items)
+
+
+class _DeviceInfoReconciler:
+    """Keep an entity's dynamic device-registry fields in sync cheaply.
+
+    The naive pattern — call ``async_get_device`` and ``async_update_device``
+    on every coordinator tick — is doubly expensive on modern HA: the lookup
+    goes through the deprecated ``device_registry.async_get_device`` (which runs
+    ``frame.report_usage`` and walks the whole Python stack on every call), and
+    it churns the registry even when nothing changed. With many per-port /
+    per-client devices that dominates the event loop.
+
+    This mixin instead:
+      * resolves the entity's device id **once** (from the entity's own
+        registry entry, falling back to a single non-deprecated
+        ``async_get_device_by_identifier`` lookup) and caches it;
+      * on each tick compares the *desired* spec to the last-applied one and
+        does **zero** registry access when unchanged;
+      * only on a real change reads the current entry by id (cheap, no
+        ``report_usage``) and writes exactly the fields that differ;
+      * subscribes to registry updates for its own device so an **external**
+        edit (someone renames it, another integration touches it, or it is
+        removed) invalidates the cache and is re-asserted on the next tick;
+      * replaces the deprecated ``merge_connections`` with a read-union
+        ``new_connections`` write.
+
+    Subclasses implement :meth:`_reconcile_config_entry_id`,
+    :meth:`_reconcile_identifier` and :meth:`_reconcile_desired`.
+    """
+
+    # Populated lazily; declared for mypy.
+    hass: HomeAssistant
+    registry_entry: Any
+    _device_id: str | None = None
+    _applied_key: tuple[tuple[str, Any], ...] | None = None
+    _unsub_devreg: CALLBACK_TYPE | None = None
+
+    # --- hooks the subclass provides -------------------------------------
+    @property
+    def _reconcile_config_entry_id(self) -> str:
+        raise NotImplementedError
+
+    def _reconcile_identifier(self) -> tuple[str, str]:
+        raise NotImplementedError
+
+    def _reconcile_desired(self) -> dict[str, Any] | None:
+        """Return the desired dynamic device fields, or None to skip.
+
+        Recognised keys: ``name``, ``model``, ``sw_version``,
+        ``serial_number`` (scalars compared to the entry); ``via_identifier``
+        (a ``(domain, id)`` tuple or ``None`` — resolved to ``via_device_id``);
+        ``mac_connections`` (a set of MAC connection tuples) with optional
+        ``mac_mode`` = ``"replace"`` (default) or ``"add"``.
+        """
+        raise NotImplementedError
+
+    # --- plumbing --------------------------------------------------------
+    @callback
+    def _ensure_devreg_subscription(self) -> None:
+        """Resolve and cache the device id, subscribing to its updates once."""
+        if self._device_id is not None:
+            return
+        did: str | None = None
+        reg = self.registry_entry
+        if reg is not None:
+            did = reg.device_id
+        if did is None:
+            dev_reg = device_registry.async_get(self.hass)
+            entry = dev_reg.async_get_device_by_identifier(
+                self._reconcile_identifier(), self._reconcile_config_entry_id
+            )
+            did = entry.id if entry else None
+        if did is None:
+            return
+        self._device_id = did
+        if self._unsub_devreg is None:
+            self._unsub_devreg = async_track_device_registry_updated_event(
+                self.hass, did, self._on_devreg_updated
+            )
+
+    @callback
+    def _on_devreg_updated(self, event: Event[EventDeviceRegistryUpdatedData]) -> None:
+        """React to an external change to our device.
+
+        We only invalidate the cache here; the actual re-assert happens on the
+        next coordinator tick. That keeps all writes on the coordinator cadence
+        (at most one per tick) and avoids an event-driven write loop, while
+        still correcting an external edit promptly.
+        """
+        if event.data["action"] == "remove":
+            # The device is gone: drop the id AND tear down the now-dead
+            # subscription, so _ensure_devreg_subscription re-resolves and
+            # re-subscribes if a device with the same identifier is recreated.
+            self._stop_devinfo_reconcile()
+            self._device_id = None
+        self._applied_key = None
+
+    @callback
+    def _stop_devinfo_reconcile(self) -> None:
+        if self._unsub_devreg is not None:
+            self._unsub_devreg()
+            self._unsub_devreg = None
+
+    @callback
+    def _reconcile_device_info(self) -> None:
+        self._ensure_devreg_subscription()
+        if self._device_id is None:
+            return
+        desired = self._reconcile_desired()
+        if desired is None:
+            return
+        key = _devinfo_key(desired)
+        if key == self._applied_key:
+            return  # nothing changed → no registry access at all
+
+        dev_reg = device_registry.async_get(self.hass)
+        # Our devices are main devices; exclude child devices so the returned
+        # type is DeviceEntry (which carries connections/via_device_id).
+        entry = dev_reg.async_get(self._device_id, include_child_devices=False)
+        if entry is None:
+            # Device vanished; drop the dead subscription too so we re-resolve
+            # and re-subscribe on a later tick.
+            self._stop_devinfo_reconcile()
+            self._device_id = None
+            self._applied_key = None
+            return
+
+        kwargs: dict[str, Any] = {}
+        for field in ("name", "model", "sw_version", "serial_number"):
+            if field in desired and getattr(entry, field) != desired[field]:
+                kwargs[field] = desired[field]
+
+        # Resolve the parent link. via_identifier of None means "no parent" —
+        # clear any existing link. A named-but-unresolved parent (not yet in the
+        # registry) must leave an existing link untouched and defer caching so we
+        # retry — never clear a good link over a transient resolution miss.
+        via_incomplete = False
+        if "via_identifier" in desired:
+            via_ident = desired["via_identifier"]
+            if via_ident is None:
+                if entry.via_device_id is not None:
+                    kwargs["via_device_id"] = None
+            else:
+                via = dev_reg.async_get_device_by_identifier(
+                    via_ident, self._reconcile_config_entry_id
+                )
+                if via is None:
+                    via_incomplete = True  # parent pending — leave link, retry
+                elif entry.via_device_id != via.id:
+                    kwargs["via_device_id"] = via.id
+
+        conn_update: set[tuple[str, str]] | None = None
+        if "mac_connections" in desired:
+            desired_macs: set[tuple[str, str]] = desired["mac_connections"]
+            current_macs = {
+                (t, v)
+                for t, v in entry.connections
+                if t == device_registry.CONNECTION_NETWORK_MAC
+            }
+            if desired.get("mac_mode") == "add":
+                target_macs = current_macs | desired_macs
+            else:
+                target_macs = desired_macs
+            if current_macs != target_macs:
+                non_mac = {
+                    (t, v)
+                    for t, v in entry.connections
+                    if t != device_registry.CONNECTION_NETWORK_MAC
+                }
+                conn_update = non_mac | target_macs
+
+        # Apply scalar/link fields and MAC connections as SEPARATE writes: a
+        # routine connection collision (a client roaming between ports) must not
+        # drop a bundled rename, and a failed write must not be cached as applied
+        # — otherwise the entity would never retry once the conflict clears,
+        # permanently stranding e.g. a port unlinked from its client.
+        write_ok = True
+        if kwargs:
+            try:
+                dev_reg.async_update_device(self._device_id, **kwargs)
+            except HomeAssistantError as err:
+                write_ok = False
+                _LOGGER.debug(
+                    "Device info reconcile failed for %s: %s", self._device_id, err
+                )
+        if conn_update is not None:
+            try:
+                dev_reg.async_update_device(
+                    self._device_id, new_connections=conn_update
+                )
+            except HomeAssistantError as err:
+                # e.g. a MAC we tried to add is already on another device in the
+                # same config entry; it may free up later, so leave the spec
+                # uncached to retry.
+                write_ok = False
+                _LOGGER.debug(
+                    "Connection reconcile failed for %s: %s", self._device_id, err
+                )
+        # Cache the applied spec only when every attempted write succeeded and
+        # the parent link resolved — otherwise leave it so the next tick retries.
+        if write_ok and not via_incomplete:
+            self._applied_key = key
+
+
+class SwitchPortBaseEntity(_DeviceInfoReconciler, SensorEntity):
     _attr_has_entity_name = True
     _attr_should_poll = False
 
@@ -1334,6 +1556,7 @@ class SwitchPortBaseEntity(SensorEntity):
             self._unsub_coordinator()
         if hasattr(self, "_unsub_devinfo") and self._unsub_devinfo:
             self._unsub_devinfo()
+        self._stop_devinfo_reconcile()
         await super().async_will_remove_from_hass()
 
     async def async_added_to_hass(self) -> None:
@@ -1341,57 +1564,46 @@ class SwitchPortBaseEntity(SensorEntity):
         self._unsub_coordinator = self.coordinator.async_add_listener(
             self.async_write_ha_state
         )
-
-        @callback
-        def _update_device_info() -> None:
-            """
-            Update HA device registry with dynamic system info.
-            """
-            try:
-                if not self.coordinator.data:
-                    return
-
-                system = self.coordinator.data.system
-
-                raw_hostname = system.get("hostname") or ""
-                device_name = raw_hostname.strip() or f"Switch {self.coordinator.host}"
-                model = system.get("model") or ""
-                firmware = system.get("firmware")
-
-                # Update device registry entry
-                dev_reg = device_registry.async_get(self.hass)
-                device_entry = dev_reg.async_get_device(
-                    identifiers={(DOMAIN, f"{self.entry_id}_{self.coordinator.host}")}
-                )
-                if device_entry:
-                    # Publish our own chassis MAC (additively) so a neighbour
-                    # switch running this integration, which stamps this MAC on
-                    # its uplink port, links that port back to this device.
-                    chassis_mac = system.get("chassis_mac")
-                    extra: dict[str, Any] = {}
-                    if chassis_mac:
-                        extra["merge_connections"] = {
-                            (
-                                device_registry.CONNECTION_NETWORK_MAC,
-                                device_registry.format_mac(chassis_mac),
-                            )
-                        }
-                    dev_reg.async_update_device(
-                        device_entry.id,
-                        name=device_name,
-                        model=model,
-                        sw_version=firmware,
-                        **extra,
-                    )
-            except SnmpError, OSError:
-                _LOGGER.exception("Entity update failed for %s", self.coordinator.host)
-
-        # Run on each coordinator update
-        self._unsub_devinfo = self.coordinator.async_add_listener(_update_device_info)
-
-        # Also run immediately on entity creation (if we already have data)
+        # Keep the switch device's dynamic fields (hostname/model/firmware and
+        # our own chassis MAC) in sync, but only touch the registry when they
+        # actually change — see _DeviceInfoReconciler.
+        self._unsub_devinfo = self.coordinator.async_add_listener(
+            self._reconcile_device_info
+        )
         if self.coordinator.data:
-            _update_device_info()
+            self._reconcile_device_info()
+
+    # --- _DeviceInfoReconciler hooks ---
+    @property
+    def _reconcile_config_entry_id(self) -> str:
+        return self.entry_id
+
+    def _reconcile_identifier(self) -> tuple[str, str]:
+        return (DOMAIN, f"{self.entry_id}_{self.coordinator.host}")
+
+    def _reconcile_desired(self) -> dict[str, Any] | None:
+        if not self.coordinator.data:
+            return None
+        system = self.coordinator.data.system
+        raw_hostname = system.get("hostname") or ""
+        desired: dict[str, Any] = {
+            "name": raw_hostname.strip() or f"Switch {self.coordinator.host}",
+            "model": system.get("model") or "",
+            "sw_version": system.get("firmware"),
+        }
+        # Publish our own chassis MAC (additively) so a neighbour switch running
+        # this integration, which stamps this MAC on its uplink port, links that
+        # port back to this device.
+        chassis_mac = system.get("chassis_mac")
+        if chassis_mac:
+            desired["mac_connections"] = {
+                (
+                    device_registry.CONNECTION_NETWORK_MAC,
+                    device_registry.format_mac(chassis_mac),
+                )
+            }
+            desired["mac_mode"] = "add"
+        return desired
 
 
 # --- Aggregate and Port Sensors ---
@@ -1485,7 +1697,7 @@ class FirmwareSensor(SwitchPortBaseEntity):
 # =============================================================================
 # Per-port device pattern — each port is a sub-device of the switch
 # =============================================================================
-class SwitchPortPerPortBaseEntity(SensorEntity):
+class SwitchPortPerPortBaseEntity(_DeviceInfoReconciler, SensorEntity):
     """Base for entities attached to a per-port sub-device.
 
     Each port becomes its own device in the registry, linked to the parent
@@ -1506,7 +1718,6 @@ class SwitchPortPerPortBaseEntity(SensorEntity):
         self._unsub: Callable[[], None] | None = None
         self._unsub_devinfo: Callable[[], None] | None = None
 
-        switch_identifier = (DOMAIN, f"{entry_id}_{coordinator.host}")
         port_identifier = (DOMAIN, f"{entry_id}_{coordinator.host}_port_{port}")
         port_info = coordinator.port_mapping.get(int(port), {}) or {}
         port_name = (
@@ -1531,13 +1742,15 @@ class SwitchPortPerPortBaseEntity(SensorEntity):
         # the LLDP neighbour (an AP/switch) or the FDB-learned client(s).
         connections = self._desired_mac_connections(self._port_data() or {})
 
+        # NB: the parent link (``via_device``) is set by the reconciler as
+        # ``via_device_id`` — 2026.9 dropped ``via_device`` from DeviceInfo, and
+        # resolving the parent by id also avoids re-linking churn.
         self._attr_device_info = DeviceInfo(
             identifiers={port_identifier},
             connections=connections,
             name=device_name,
             manufacturer=manufacturer,
             model=model,
-            via_device=switch_identifier,
         )
 
     def _switch_label(self) -> str:
@@ -1583,70 +1796,51 @@ class SwitchPortPerPortBaseEntity(SensorEntity):
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
         self._unsub = self.coordinator.async_add_listener(self.async_write_ha_state)
+        # Keep the port device's name and MAC links in sync, but only touch the
+        # registry when they actually change — see _DeviceInfoReconciler.
         self._unsub_devinfo = self.coordinator.async_add_listener(
-            self._update_port_device_info
+            self._reconcile_device_info
         )
         if self.coordinator.data:
-            self._update_port_device_info()
+            self._reconcile_device_info()
 
     async def async_will_remove_from_hass(self) -> None:
         if self._unsub is not None:
             self._unsub()
         if self._unsub_devinfo is not None:
             self._unsub_devinfo()
+        self._stop_devinfo_reconcile()
         await super().async_will_remove_from_hass()
 
-    @callback
-    def _update_port_device_info(self) -> None:
-        try:
-            if not self.coordinator.data:
-                return
-            dev_reg = device_registry.async_get(self.hass)
-            device_entry = dev_reg.async_get_device(
-                identifiers={
-                    (
-                        DOMAIN,
-                        f"{self.entry_id}_{self.coordinator.host}_port_{self.port}",
-                    )
-                }
-            )
-            if not device_entry:
-                return
-            port_name = (self._port_data().get("name") or "").strip()
-            switch_label = self._switch_label()
-            new_name = f"{switch_label} / Port {self.port}"
-            if port_name and port_name != f"Port {self.port}":
-                new_name = f"{switch_label} / Port {self.port} ({port_name})"
-            if device_entry.name != new_name:
-                dev_reg.async_update_device(device_entry.id, name=new_name)
-            # Reconcile the port's MAC links to exactly the current link set (the
-            # LLDP neighbour, or the FDB client(s)): add the current MACs and
-            # prune any previously-stamped one, so a port that saw a different
-            # neighbour/client before is not left linked to every host ever seen
-            # on it. Cross-entry shared MACs link without colliding; the
-            # one-port-per-MAC dedup keeps a MAC on one port, avoiding same-entry
-            # clashes. Non-MAC connections are preserved untouched.
-            desired = self._desired_mac_connections(self._port_data())
-            current = {
-                (t, v)
-                for t, v in device_entry.connections
-                if t == device_registry.CONNECTION_NETWORK_MAC
-            }
-            if current != desired:
-                kept = {
-                    (t, v)
-                    for t, v in device_entry.connections
-                    if t != device_registry.CONNECTION_NETWORK_MAC
-                }
-                kept |= desired
-                dev_reg.async_update_device(device_entry.id, new_connections=kept)
-        except HomeAssistantError as err:
-            _LOGGER.debug(
-                "Port device update failed for %s port %s: %s",
-                self.coordinator.host,
-                self.port,
-                err,
-            )
+    # --- _DeviceInfoReconciler hooks ---
+    @property
+    def _reconcile_config_entry_id(self) -> str:
+        return self.entry_id
+
+    def _reconcile_identifier(self) -> tuple[str, str]:
+        return (DOMAIN, f"{self.entry_id}_{self.coordinator.host}_port_{self.port}")
+
+    def _reconcile_desired(self) -> dict[str, Any] | None:
+        if not self.coordinator.data:
+            return None
+        port_name = (self._port_data().get("name") or "").strip()
+        switch_label = self._switch_label()
+        new_name = f"{switch_label} / Port {self.port}"
+        if port_name and port_name != f"Port {self.port}":
+            new_name = f"{switch_label} / Port {self.port} ({port_name})"
+        # Reconcile the port's MAC links to exactly the current link set (the
+        # LLDP neighbour, or the FDB client(s)): the reconciler prunes any
+        # previously-stamped MAC not in this set, so a port that saw a different
+        # neighbour/client before is not left linked to every host ever seen on
+        # it. Cross-entry shared MACs link without colliding; the
+        # one-port-per-MAC dedup keeps a MAC on one port. Non-MAC connections
+        # are preserved untouched.
+        return {
+            "name": new_name,
+            "via_identifier": (DOMAIN, f"{self.entry_id}_{self.coordinator.host}"),
+            "mac_connections": self._desired_mac_connections(self._port_data()),
+            "mac_mode": "replace",
+        }
 
 
 class PortStatusSensor(SwitchPortPerPortBaseEntity):
