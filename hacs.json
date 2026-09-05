@@ -1,6 +1,6 @@
 {
   "name": "Switch Port Card Pro",
-  "homeassistant": "2026.8.0",
+  "homeassistant": "2026.9.0",
   "render_readme": true,
   "zip_release": true,
   "filename": "switch_port_card_pro.zip"

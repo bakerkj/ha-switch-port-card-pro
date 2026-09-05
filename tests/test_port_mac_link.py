@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 """Device-registry reconcile tests for port-to-device MAC linking.
 
-Drives SwitchPortPerPortBaseEntity._update_port_device_info against a real
+Drives SwitchPortPerPortBaseEntity._reconcile_device_info against a real
 device registry — the code path that stamps/prunes a port device's
 CONNECTION_NETWORK_MAC. It must add the current single client's MAC, replace
 (not accumulate) a changed one, prune it when the client goes away, and never
@@ -73,8 +73,8 @@ async def _setup(
 
 async def test_first_update_links_client_mac(hass: HomeAssistant) -> None:
     reg, port_id, entity = await _setup(hass, "AA:BB:CC:DD:EE:01", set())
-    entity._update_port_device_info()
-    device = reg.async_get_device(identifiers={port_id})
+    entity._reconcile_device_info()
+    device = reg.async_get_device_by_identifier(port_id, entity.entry_id)
     assert device is not None
     assert _network_macs(device) == {dr.format_mac("AA:BB:CC:DD:EE:01")}
 
@@ -84,8 +84,8 @@ async def test_changed_client_mac_replaces_not_accumulates(
 ) -> None:
     old = (dr.CONNECTION_NETWORK_MAC, dr.format_mac("AA:BB:CC:DD:EE:01"))
     reg, port_id, entity = await _setup(hass, "AA:BB:CC:DD:EE:02", {old})
-    entity._update_port_device_info()
-    device = reg.async_get_device(identifiers={port_id})
+    entity._reconcile_device_info()
+    device = reg.async_get_device_by_identifier(port_id, entity.entry_id)
     assert device is not None
     # exactly the new MAC — the old one must NOT linger
     assert _network_macs(device) == {dr.format_mac("AA:BB:CC:DD:EE:02")}
@@ -94,8 +94,8 @@ async def test_changed_client_mac_replaces_not_accumulates(
 async def test_disappeared_client_mac_is_pruned(hass: HomeAssistant) -> None:
     old = (dr.CONNECTION_NETWORK_MAC, dr.format_mac("AA:BB:CC:DD:EE:01"))
     reg, port_id, entity = await _setup(hass, None, {old})
-    entity._update_port_device_info()
-    device = reg.async_get_device(identifiers={port_id})
+    entity._reconcile_device_info()
+    device = reg.async_get_device_by_identifier(port_id, entity.entry_id)
     assert device is not None
     assert _network_macs(device) == set()
 
@@ -104,8 +104,8 @@ async def test_non_mac_connections_survive(hass: HomeAssistant) -> None:
     keep = (dr.CONNECTION_UPNP, "uuid:switch-port-card-pro-test")
     old = (dr.CONNECTION_NETWORK_MAC, dr.format_mac("AA:BB:CC:DD:EE:01"))
     reg, port_id, entity = await _setup(hass, "AA:BB:CC:DD:EE:02", {old, keep})
-    entity._update_port_device_info()
-    device = reg.async_get_device(identifiers={port_id})
+    entity._reconcile_device_info()
+    device = reg.async_get_device_by_identifier(port_id, entity.entry_id)
     assert device is not None
     assert _network_macs(device) == {dr.format_mac("AA:BB:CC:DD:EE:02")}
     assert keep in device.connections  # non-MAC connection untouched
@@ -116,7 +116,7 @@ async def test_no_op_when_mac_already_current(hass: HomeAssistant) -> None:
     reg, port_id, entity = await _setup(
         hass, "AA:BB:CC:DD:EE:01", {(dr.CONNECTION_NETWORK_MAC, mac)}
     )
-    entity._update_port_device_info()
-    device = reg.async_get_device(identifiers={port_id})
+    entity._reconcile_device_info()
+    device = reg.async_get_device_by_identifier(port_id, entity.entry_id)
     assert device is not None
     assert _network_macs(device) == {mac}

@@ -8,7 +8,7 @@ Covers the switch-side of the AP/switch link:
   * _select_port_link_macs -- the LLDP-neighbour-wins-over-FDB precedence that
     keeps an AP-uplink port linked to the AP alone, never its wifi clients.
   * _desired_mac_connections -- the link_macs set (with client_mac back-compat).
-  * _update_port_device_info -- stamping a *set* of MACs onto the port device,
+  * _reconcile_device_info -- stamping a *set* of MACs onto the port device,
     replacing/pruning against a real device registry.
 """
 
@@ -149,8 +149,8 @@ async def _setup(
 
 async def test_reconcile_stamps_the_neighbour_mac(hass: HomeAssistant) -> None:
     reg, port_id, entity = await _setup(hass, [_AP_MAC], set())
-    entity._update_port_device_info()
-    device = reg.async_get_device(identifiers={port_id})
+    entity._reconcile_device_info()
+    device = reg.async_get_device_by_identifier(port_id, entity.entry_id)
     assert device is not None
     assert _network_macs(device) == {dr.format_mac(_AP_MAC)}
 
@@ -158,8 +158,8 @@ async def test_reconcile_stamps_the_neighbour_mac(hass: HomeAssistant) -> None:
 async def test_reconcile_stamps_multiple_client_macs(hass: HomeAssistant) -> None:
     # max_clients_to_link = 2: a two-client port links both.
     reg, port_id, entity = await _setup(hass, [_CLIENT_A, _CLIENT_B], set())
-    entity._update_port_device_info()
-    device = reg.async_get_device(identifiers={port_id})
+    entity._reconcile_device_info()
+    device = reg.async_get_device_by_identifier(port_id, entity.entry_id)
     assert device is not None
     assert _network_macs(device) == {
         dr.format_mac(_CLIENT_A),
@@ -170,8 +170,8 @@ async def test_reconcile_stamps_multiple_client_macs(hass: HomeAssistant) -> Non
 async def test_reconcile_replaces_a_prior_link(hass: HomeAssistant) -> None:
     old = _conn(_CLIENT_A)
     reg, port_id, entity = await _setup(hass, [_AP_MAC], {old})
-    entity._update_port_device_info()
-    device = reg.async_get_device(identifiers={port_id})
+    entity._reconcile_device_info()
+    device = reg.async_get_device_by_identifier(port_id, entity.entry_id)
     assert device is not None
     assert _network_macs(device) == {dr.format_mac(_AP_MAC)}
 
@@ -179,8 +179,8 @@ async def test_reconcile_replaces_a_prior_link(hass: HomeAssistant) -> None:
 async def test_reconcile_prunes_when_link_set_empties(hass: HomeAssistant) -> None:
     old = _conn(_AP_MAC)
     reg, port_id, entity = await _setup(hass, [], {old})
-    entity._update_port_device_info()
-    device = reg.async_get_device(identifiers={port_id})
+    entity._reconcile_device_info()
+    device = reg.async_get_device_by_identifier(port_id, entity.entry_id)
     assert device is not None
     assert _network_macs(device) == set()
 
@@ -190,8 +190,8 @@ async def test_reconcile_leaves_non_mac_connections_untouched(
 ) -> None:
     keep = (dr.CONNECTION_UPNP, "uuid:switch-port-card-pro-test")
     reg, port_id, entity = await _setup(hass, [_AP_MAC], {keep})
-    entity._update_port_device_info()
-    device = reg.async_get_device(identifiers={port_id})
+    entity._reconcile_device_info()
+    device = reg.async_get_device_by_identifier(port_id, entity.entry_id)
     assert device is not None
     assert _network_macs(device) == {dr.format_mac(_AP_MAC)}
     assert keep in device.connections
