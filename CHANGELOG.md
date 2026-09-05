@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.1.1](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.1.0...v1.1.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* migrate off deprecated async_get_device for HA 2026.9 ([#27](https://github.com/bakerkj/ha-switch-port-card-pro/issues/27)) ([2375cd0](https://github.com/bakerkj/ha-switch-port-card-pro/commit/2375cd0aa6c3e57ad92d92e98511879750c6199c))
+
+
+### Miscellaneous Chores
+
+* **deps:** update anthropics/claude-code-action action to v1.0.205 ([#16](https://github.com/bakerkj/ha-switch-port-card-pro/issues/16)) ([fe20718](https://github.com/bakerkj/ha-switch-port-card-pro/commit/fe207189c10c0c8c9f0a7dc7cec997f410d61a51))
+* **deps:** update anthropics/claude-code-action action to v1.0.211 ([#20](https://github.com/bakerkj/ha-switch-port-card-pro/issues/20)) ([8a44365](https://github.com/bakerkj/ha-switch-port-card-pro/commit/8a4436500f8d4d6238d2385127af13636a738def))
+* **deps:** update anthropics/claude-code-action action to v1.0.212 ([#21](https://github.com/bakerkj/ha-switch-port-card-pro/issues/21)) ([501fe68](https://github.com/bakerkj/ha-switch-port-card-pro/commit/501fe68429f26a2e7b77937903d15a51c54a86bb))
+* **deps:** update anthropics/claude-code-action action to v1.0.213 ([#26](https://github.com/bakerkj/ha-switch-port-card-pro/issues/26)) ([aae4132](https://github.com/bakerkj/ha-switch-port-card-pro/commit/aae41329b8e00a04c3a96f6b006f6fac58beb417))
+* **deps:** update dependency uv to v0.12.10 ([#25](https://github.com/bakerkj/ha-switch-port-card-pro/issues/25)) ([459bb7d](https://github.com/bakerkj/ha-switch-port-card-pro/commit/459bb7d922024ecb10d367d7f1d1597a6445ef8b))
+* **deps:** update dependency uv to v0.12.6 ([#14](https://github.com/bakerkj/ha-switch-port-card-pro/issues/14)) ([6993d04](https://github.com/bakerkj/ha-switch-port-card-pro/commit/6993d04fb0a4e06f8e2e303c5ea6f8b1725f87f9))
+* **deps:** update dependency uv to v0.12.7 ([#17](https://github.com/bakerkj/ha-switch-port-card-pro/issues/17)) ([8e3d75b](https://github.com/bakerkj/ha-switch-port-card-pro/commit/8e3d75bfb881973e778913da7c197bb7df1afdd8))
+* **deps:** update dependency uv to v0.12.8 ([#19](https://github.com/bakerkj/ha-switch-port-card-pro/issues/19)) ([e9128d0](https://github.com/bakerkj/ha-switch-port-card-pro/commit/e9128d0131261fde24fd24989450d7c032f7947a))
+* **deps:** update dependency uv to v0.12.9 ([#23](https://github.com/bakerkj/ha-switch-port-card-pro/issues/23)) ([1109099](https://github.com/bakerkj/ha-switch-port-card-pro/commit/11090991396edbd304b215482d4d8b985a24b500))
+* **deps:** update pre-commit hook astral-sh/ruff-pre-commit to v0.16.5 ([#18](https://github.com/bakerkj/ha-switch-port-card-pro/issues/18)) ([3860849](https://github.com/bakerkj/ha-switch-port-card-pro/commit/38608494ec9d80efcea6ba0dfc95e8a649d63210))
+* **deps:** update pre-commit hook astral-sh/ruff-pre-commit to v0.16.6 ([#22](https://github.com/bakerkj/ha-switch-port-card-pro/issues/22)) ([66fd62a](https://github.com/bakerkj/ha-switch-port-card-pro/commit/66fd62a5f1d42a142070c3c00ad8d546d0f6269e))
+
 ## [1.1.0](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.0.18...v1.1.0) (2026-08-24)
 
 
