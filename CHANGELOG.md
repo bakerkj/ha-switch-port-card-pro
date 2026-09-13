@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.1.2...v1.1.3) (2026-09-13)
+
+
+### Miscellaneous Chores
+
+* **deps:** update github-actions ([#35](https://github.com/bakerkj/ha-switch-port-card-pro/issues/35)) ([d3c288e](https://github.com/bakerkj/ha-switch-port-card-pro/commit/d3c288e3a9405d5a1cfc7ec2a23f436313d090eb))
+
 ## [1.1.2](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.1.1...v1.1.2) (2026-09-13)
 
 
