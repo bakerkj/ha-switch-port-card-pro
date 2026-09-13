@@ -133,6 +133,12 @@ class SwitchPortData:
     system: dict[str, Any]
 
 
+# Entities written per event-loop tick when spreading a poll's state updates.
+# Writing a switch's worth of entities in one tick briefly blocks the loop;
+# small chunks with a yield between keep any single tick short.
+_LISTENER_FLUSH_CHUNK = 20
+
+
 class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
     def __init__(
         self,
@@ -212,6 +218,9 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
         # only on emit; held value re-published between emits.
         self._bandwidth_ref: tuple[int, float] | None = None
         self._held_bandwidth_mbps: float = 0.0
+        # In-flight task that spreads a poll's entity writes across ticks; a
+        # newer poll supersedes it.
+        self._flush_task: asyncio.Task[None] | None = None
 
     def _emit_now(self, key: str) -> bool:
         """Whether ``key``'s decimated value should refresh on this poll.
@@ -224,6 +233,48 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
         if span <= 1:
             return True
         return self._poll_cycle % span == zlib.crc32(key.encode()) % span
+
+    @callback
+    def async_update_listeners(self) -> None:
+        """Notify listeners, spread across ticks when there are many.
+
+        The base method calls every listener in one tick; a switch's worth of
+        entities then flush at once and briefly stall the loop. Above one chunk
+        we write them in batches with a yield between, so no single tick does
+        the whole burst. Deferred writes still read the latest ``self.data``, so
+        values are as fresh as before — only the write timing is spread out.
+        """
+        if len(self._listeners) <= _LISTENER_FLUSH_CHUNK:
+            for update_callback, _ in list(self._listeners.values()):
+                update_callback()
+            return
+        # A newer poll supersedes an in-flight flush: its writes read the same
+        # latest data, so cancel the old batch rather than double-writing.
+        if self._flush_task is not None and not self._flush_task.done():
+            self._flush_task.cancel()
+        # Snapshot the listener keys (remove-listener handles), not the callbacks:
+        # the flush re-checks each against the live self._listeners per chunk, so a
+        # listener that unsubscribes during a sleep(0) yield is skipped instead of
+        # invoked after its entity was removed (which would raise and abort the rest).
+        self._flush_task = self.hass.async_create_task(
+            self._async_flush_listeners(list(self._listeners)),
+            name=f"{DOMAIN}_flush_{self.host}",
+        )
+
+    async def _async_flush_listeners(self, keys: list[int]) -> None:
+        """Call still-registered listeners in chunks, yielding between chunks."""
+        for start in range(0, len(keys), _LISTENER_FLUSH_CHUNK):
+            for key in keys[start : start + _LISTENER_FLUSH_CHUNK]:
+                entry = self._listeners.get(key)
+                if entry is not None:
+                    entry[0]()  # the update_callback, only if still subscribed
+            await asyncio.sleep(0)
+
+    async def async_shutdown(self) -> None:
+        """Cancel any in-flight listener flush, then shut down normally."""
+        if self._flush_task is not None and not self._flush_task.done():
+            self._flush_task.cancel()
+        await super().async_shutdown()
 
     def _resolve_boot_time(self, sys_uptime_ticks: int | None) -> Any:
         """Stable datetime the switch came online.
