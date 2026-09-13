@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.1.2](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.1.1...v1.1.2) (2026-09-13)
+
+
+### Performance Improvements
+
+* spread a poll's entity writes across event-loop ticks ([#32](https://github.com/bakerkj/ha-switch-port-card-pro/issues/32)) ([5dca699](https://github.com/bakerkj/ha-switch-port-card-pro/commit/5dca699376bb33c90d1ed2f89fa27c2c1b5af716))
+
+
+### Miscellaneous Chores
+
+* **deps:** update anthropics/claude-code-action action to v1.0.217 ([#28](https://github.com/bakerkj/ha-switch-port-card-pro/issues/28)) ([d22f925](https://github.com/bakerkj/ha-switch-port-card-pro/commit/d22f92525d4b5d600b21f44b9d55c24cc4645b58))
+* **deps:** update anthropics/claude-code-action action to v1.0.218 ([#30](https://github.com/bakerkj/ha-switch-port-card-pro/issues/30)) ([8cdb443](https://github.com/bakerkj/ha-switch-port-card-pro/commit/8cdb443ac4c9f5ff94981403316e6e2b27783bb4))
+* **deps:** update dependency uv to v0.12.13 ([#33](https://github.com/bakerkj/ha-switch-port-card-pro/issues/33)) ([7cdfc2d](https://github.com/bakerkj/ha-switch-port-card-pro/commit/7cdfc2d92c2f09911a8939f6c40a31edb6ed52c0))
+* **deps:** update github-actions ([#34](https://github.com/bakerkj/ha-switch-port-card-pro/issues/34)) ([9aaa4df](https://github.com/bakerkj/ha-switch-port-card-pro/commit/9aaa4df49305ff381b2ad1183a94af69f07150c1))
+* **deps:** update pre-commit hook astral-sh/ruff-pre-commit to v0.16.7 ([#31](https://github.com/bakerkj/ha-switch-port-card-pro/issues/31)) ([37eeaee](https://github.com/bakerkj/ha-switch-port-card-pro/commit/37eeaeeb11c7a71619ce1fb1a9ac19599adcaad9))
+
 ## [1.1.1](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.1.0...v1.1.1) (2026-09-05)
 
 
