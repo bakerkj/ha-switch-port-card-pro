@@ -36,5 +36,5 @@ jobs:
           uv pip install --upgrade \
             "homeassistant @ git+https://github.com/home-assistant/core.git@dev"
       - name: Run HA signature guard
-        run:
-          uv run --no-sync python -m pytest tests/test_ha_signature_compat.py -v
+        # Shim pre-aliases httpx2 before pytest (see script docstring).
+        run: uv run --no-sync python .github/scripts/run_signature_guard.py
