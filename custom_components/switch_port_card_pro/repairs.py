@@ -13,9 +13,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from homeassistant.components.repairs import RepairsFlow
+from homeassistant.components.repairs import RepairsFlow, RepairsFlowResult
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResult
 
 from .const import DOMAIN
 from .entity_manager import PortEntityManager
@@ -37,7 +36,7 @@ class PortDownRepairFlow(RepairsFlow):
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> RepairsFlowResult:
         return self.async_show_menu(
             step_id="init",
             menu_options=["disable_this", "disable_all", "ignore", "allow_flap"],
@@ -45,7 +44,7 @@ class PortDownRepairFlow(RepairsFlow):
 
     async def async_step_disable_this(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> RepairsFlowResult:
         mgr = self._manager()
         port = self._data.get("port")
         if mgr is not None and port is not None:
@@ -54,7 +53,7 @@ class PortDownRepairFlow(RepairsFlow):
 
     async def async_step_disable_all(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> RepairsFlowResult:
         mgr = self._manager()
         if mgr is not None:
             await mgr.async_disable_all_flagged()
@@ -62,7 +61,7 @@ class PortDownRepairFlow(RepairsFlow):
 
     async def async_step_ignore(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> RepairsFlowResult:
         mgr = self._manager()
         port = self._data.get("port")
         if mgr is not None and port is not None:
@@ -71,7 +70,7 @@ class PortDownRepairFlow(RepairsFlow):
 
     async def async_step_allow_flap(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> RepairsFlowResult:
         mgr = self._manager()
         port = self._data.get("port")
         if mgr is not None and port is not None:
