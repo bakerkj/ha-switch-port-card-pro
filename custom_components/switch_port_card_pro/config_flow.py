@@ -144,9 +144,10 @@ class SwitchPortCardProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     },
                 )
 
+        # HA 2026.10 retyped data_schema as probatio.Schema; runtime still accepts vol.
         return self.async_show_form(
             step_id="user",
-            data_schema=STEP_USER_SCHEMA,
+            data_schema=STEP_USER_SCHEMA,  # type: ignore[arg-type,unused-ignore]
             errors=errors,
         )
 
@@ -201,7 +202,7 @@ class SwitchPortCardProConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="reconfigure",
-            data_schema=vol.Schema(
+            data_schema=vol.Schema(  # type: ignore[arg-type,unused-ignore]
                 {
                     vol.Required(CONF_HOST, default=entry.data.get(CONF_HOST, "")): str,
                     vol.Required(
@@ -262,7 +263,7 @@ class SwitchPortCardProOptionsFlow(config_entries.OptionsFlow):
             if errors:
                 return self.async_show_form(
                     step_id="options",
-                    data_schema=self._build_schema(current, user_input),
+                    data_schema=self._build_schema(current, user_input),  # type: ignore[arg-type,unused-ignore]
                     errors=errors,
                 )
 
@@ -288,7 +289,7 @@ class SwitchPortCardProOptionsFlow(config_entries.OptionsFlow):
             if errors:
                 return self.async_show_form(
                     step_id="options",
-                    data_schema=self._build_schema(current, user_input),
+                    data_schema=self._build_schema(current, user_input),  # type: ignore[arg-type,unused-ignore]
                     errors=errors,
                 )
 
@@ -301,7 +302,7 @@ class SwitchPortCardProOptionsFlow(config_entries.OptionsFlow):
 
         return self.async_show_form(
             step_id="options",
-            data_schema=self._build_schema(current),
+            data_schema=self._build_schema(current),  # type: ignore[arg-type,unused-ignore]
         )
 
     def _build_schema(
