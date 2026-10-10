@@ -1,5 +1,48 @@
 # Changelog
 
+## [1.1.3](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.1.2...v1.1.3) (2026-10-10)
+
+
+### Bug Fixes
+
+* **renovate:** don't duplicate runs-on detection with the built-in manager ([#41](https://github.com/bakerkj/ha-switch-port-card-pro/issues/41)) ([7e03913](https://github.com/bakerkj/ha-switch-port-card-pro/commit/7e03913b68406714679ecec5212bdae3d2a14a89))
+
+
+### Miscellaneous Chores
+
+* **deps:** update anthropics/claude-code-action action to v1.0.225 ([#37](https://github.com/bakerkj/ha-switch-port-card-pro/issues/37)) ([067f3c2](https://github.com/bakerkj/ha-switch-port-card-pro/commit/067f3c2bc04cfaab5efb19cb784566d702ffefef))
+* **deps:** update anthropics/claude-code-action action to v1.0.226 ([#46](https://github.com/bakerkj/ha-switch-port-card-pro/issues/46)) ([06ebf14](https://github.com/bakerkj/ha-switch-port-card-pro/commit/06ebf1475158d1c7e4c27af90b77aa28013a46f4))
+* **deps:** update anthropics/claude-code-action action to v1.0.231 ([#47](https://github.com/bakerkj/ha-switch-port-card-pro/issues/47)) ([8bf43a9](https://github.com/bakerkj/ha-switch-port-card-pro/commit/8bf43a993860a0f39d11c086f7fa356f3571a5c2))
+* **deps:** update anthropics/claude-code-action action to v1.0.236 ([#53](https://github.com/bakerkj/ha-switch-port-card-pro/issues/53)) ([a35a88a](https://github.com/bakerkj/ha-switch-port-card-pro/commit/a35a88a4e97531b6c2abe5c1c52fa927b6019db6))
+* **deps:** update anthropics/claude-code-action action to v1.0.244 ([#59](https://github.com/bakerkj/ha-switch-port-card-pro/issues/59)) ([08480ae](https://github.com/bakerkj/ha-switch-port-card-pro/commit/08480ae5db9c979802e2d6e60a800a6a73e1edc8))
+* **deps:** update astral-sh/setup-uv action to v10.2.0 ([#48](https://github.com/bakerkj/ha-switch-port-card-pro/issues/48)) ([f46efad](https://github.com/bakerkj/ha-switch-port-card-pro/commit/f46efad8edaf6f9df1dbf8e36117afa060952560))
+* **deps:** update dependency homeassistant to ==2026.10.* ([#64](https://github.com/bakerkj/ha-switch-port-card-pro/issues/64)) ([8a70481](https://github.com/bakerkj/ha-switch-port-card-pro/commit/8a704818484c99ae4a671aca4dd24ed5f9914b84))
+* **deps:** update dependency ubuntu to v26 ([#40](https://github.com/bakerkj/ha-switch-port-card-pro/issues/40)) ([807cae9](https://github.com/bakerkj/ha-switch-port-card-pro/commit/807cae92bc2642d873a15a47b52193c40ae939f5))
+* **deps:** update dependency uv to v0.12.14 ([#38](https://github.com/bakerkj/ha-switch-port-card-pro/issues/38)) ([df1ad14](https://github.com/bakerkj/ha-switch-port-card-pro/commit/df1ad141ccc0035d7cfa05da35aa7858c0a0af0b))
+* **deps:** update dependency uv to v0.12.15 ([#39](https://github.com/bakerkj/ha-switch-port-card-pro/issues/39)) ([cd48d33](https://github.com/bakerkj/ha-switch-port-card-pro/commit/cd48d33a48f73fcb4de9a700da0883f164ca5861))
+* **deps:** update dependency uv to v0.12.17 ([#44](https://github.com/bakerkj/ha-switch-port-card-pro/issues/44)) ([c1279a8](https://github.com/bakerkj/ha-switch-port-card-pro/commit/c1279a80fd59dee8daaf038ad1f67ac42cca931e))
+* **deps:** update dependency uv to v0.12.18 ([#50](https://github.com/bakerkj/ha-switch-port-card-pro/issues/50)) ([d816512](https://github.com/bakerkj/ha-switch-port-card-pro/commit/d81651234acb1dffa6da4512609a63828db1b5be))
+* **deps:** update dependency uv to v0.12.19 ([#52](https://github.com/bakerkj/ha-switch-port-card-pro/issues/52)) ([120e72d](https://github.com/bakerkj/ha-switch-port-card-pro/commit/120e72d3a7225fe70eb3de13fa5754b44770e27e))
+* **deps:** update dependency uv to v0.12.20 ([#54](https://github.com/bakerkj/ha-switch-port-card-pro/issues/54)) ([8bdd9f3](https://github.com/bakerkj/ha-switch-port-card-pro/commit/8bdd9f3bba685204955f58df442a773946dd8269))
+* **deps:** update dependency uv to v0.12.22 ([#56](https://github.com/bakerkj/ha-switch-port-card-pro/issues/56)) ([0294be4](https://github.com/bakerkj/ha-switch-port-card-pro/commit/0294be45133eb88ea0720f92102eb4c6d59fab22))
+* **deps:** update dependency uv to v0.12.23 ([#57](https://github.com/bakerkj/ha-switch-port-card-pro/issues/57)) ([a4213ac](https://github.com/bakerkj/ha-switch-port-card-pro/commit/a4213acb45b504e6d2f79314d9efd31efd411cff))
+* **deps:** update dependency uv to v0.13.0 ([#62](https://github.com/bakerkj/ha-switch-port-card-pro/issues/62)) ([b9f6712](https://github.com/bakerkj/ha-switch-port-card-pro/commit/b9f6712d9314dde37485e108385718471aeb2f71))
+* **deps:** update github-actions ([#35](https://github.com/bakerkj/ha-switch-port-card-pro/issues/35)) ([d3c288e](https://github.com/bakerkj/ha-switch-port-card-pro/commit/d3c288e3a9405d5a1cfc7ec2a23f436313d090eb))
+* **deps:** update github-actions ([#58](https://github.com/bakerkj/ha-switch-port-card-pro/issues/58)) ([bcf3269](https://github.com/bakerkj/ha-switch-port-card-pro/commit/bcf32695f2eed6c98733adfc6f883a255e43dbdd))
+* **deps:** update github-actions ([#60](https://github.com/bakerkj/ha-switch-port-card-pro/issues/60)) ([c433425](https://github.com/bakerkj/ha-switch-port-card-pro/commit/c433425ea37cbe9aeea3ba1ed09fb84107ad61b4))
+* **deps:** update pre-commit hook alessandrojcm/commitlint-pre-commit-hook to v9.27.0 ([#49](https://github.com/bakerkj/ha-switch-port-card-pro/issues/49)) ([35f96cd](https://github.com/bakerkj/ha-switch-port-card-pro/commit/35f96cd8d903956e7244e985e1f6b1a2c3a704be))
+* **deps:** update pre-commit hook astral-sh/ruff-pre-commit to v0.16.10 ([#55](https://github.com/bakerkj/ha-switch-port-card-pro/issues/55)) ([503f477](https://github.com/bakerkj/ha-switch-port-card-pro/commit/503f477475baa17b0307ce03c71cd2fc18e79ad0))
+* **deps:** update pre-commit hook astral-sh/ruff-pre-commit to v0.17.0 ([#61](https://github.com/bakerkj/ha-switch-port-card-pro/issues/61)) ([68b2521](https://github.com/bakerkj/ha-switch-port-card-pro/commit/68b2521a27770281155fc4a7b60ff0ae3e3c36c4))
+* **deps:** update pre-commit hook rbubley/mirrors-prettier to v3.9.7 ([#43](https://github.com/bakerkj/ha-switch-port-card-pro/issues/43)) ([aae81a2](https://github.com/bakerkj/ha-switch-port-card-pro/commit/aae81a2d44145fc410e3905e4f107cfb2b8b5c11))
+* **deps:** update pre-commit hooks ([#45](https://github.com/bakerkj/ha-switch-port-card-pro/issues/45)) ([1112d80](https://github.com/bakerkj/ha-switch-port-card-pro/commit/1112d80a054fde6cbef5af598af5bd2eabc2a746))
+* **deps:** update pre-commit hooks ([#51](https://github.com/bakerkj/ha-switch-port-card-pro/issues/51)) ([a3b2916](https://github.com/bakerkj/ha-switch-port-card-pro/commit/a3b291635305541d04f2637774d8de4172014f44))
+* switch actionlint pre-commit hook from rhysd (stale) to kjanat fork ([#42](https://github.com/bakerkj/ha-switch-port-card-pro/issues/42)) ([16cb04c](https://github.com/bakerkj/ha-switch-port-card-pro/commit/16cb04c8df3f9b96dbcfa8744be2b63d8237a837))
+
+
+### Continuous Integration
+
+* **ha-dev-compat:** pre-alias httpx2 before pytest.main ([#63](https://github.com/bakerkj/ha-switch-port-card-pro/issues/63)) ([6edd780](https://github.com/bakerkj/ha-switch-port-card-pro/commit/6edd7801aed1bc6e526833294dbd9c5dc2636908))
+
 ## [1.1.2](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.1.1...v1.1.2) (2026-09-13)
 
 
