@@ -24,8 +24,9 @@ camera, a UPS, etc.).
 
 ## Requirements
 
-- Home Assistant **2026.8+** (the per-config-entry device split, where a shared
-  MAC connection links two device entries).
+- Home Assistant **2026.10+**, the release CI tests against. Linking relies on
+  the per-config-entry device split (2026.8), where a shared MAC connection
+  links two device entries.
 
 ## Installation (HACS)
 
