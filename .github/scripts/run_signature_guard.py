@@ -1,7 +1,10 @@
 # Copyright (c) 2026 Kenneth Baker <bakerkj@umich.edu>
 # SPDX-License-Identifier: MIT
-"""Pre-alias httpx2 before pytest.main so HA dev's `__init__` doesn't crash
-on pytest-homeassistant-custom-component's earlier httpx import."""
+"""Run the HA signature-compat tests against HA dev.
+
+Pre-aliases httpx2 before pytest.main so HA dev's `__init__` doesn't crash on
+an earlier real-httpx import, and skips pytest-homeassistant-custom-component,
+which is built against released HA and imports private helpers dev removes."""
 
 from __future__ import annotations
 
@@ -18,7 +21,18 @@ def main() -> int:
 
     import pytest
 
-    return pytest.main(["tests/test_ha_signature_compat.py", "-v"])
+    # No HA test plugin and no conftest.py (its fixtures need the plugin): the
+    # plugin is built for released HA and imports private helpers dev removes.
+    # These tests take no fixtures, so neither is needed.
+    return pytest.main(
+        [
+            "-p",
+            "no:homeassistant",
+            "--noconftest",
+            "tests/test_ha_signature_compat.py",
+            "-v",
+        ]
+    )
 
 
 if __name__ == "__main__":
