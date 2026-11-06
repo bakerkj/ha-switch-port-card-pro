@@ -54,6 +54,10 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 
+CARD_RESOURCE_BASES = ("/hacsfiles", "/local/community")
+CARD_RESOURCE_PATH = "switch_port_card_pro_card/switch-port-card-pro.js"
+
+
 async def async_install_frontend_resource(hass: HomeAssistant) -> None:
     """Ensure the frontend JS file is copied to the www/community folder."""
 
@@ -105,13 +109,16 @@ async def async_register_card(hass: HomeAssistant, entry: ConfigEntry) -> None:
     if not resources.loaded:
         await resources.async_load()
 
-    card_url = "/hacsfiles/switch_port_card_pro_card/switch-port-card-pro.js"
+    card_url = f"{CARD_RESOURCE_BASES[0]}/{CARD_RESOURCE_PATH}"
     # Or local: f"/local/custom_cards/{DOMAIN}-card.js"
 
-    # Check if already registered
+    # Check if already registered. Home Assistant 2026.11 moves HACS resources to
+    # /local/community and can add a query string, so match the path under either
+    # base; an exact match would add a duplicate resource on every restart.
+    registered_paths = {f"{base}/{CARD_RESOURCE_PATH}" for base in CARD_RESOURCE_BASES}
     for item in resources.async_items():
-        if item["url"] == card_url:
-            _LOGGER.debug("Card already registered: %s", card_url)
+        if item["url"].partition("?")[0] in registered_paths:
+            _LOGGER.debug("Card already registered: %s", item["url"])
             return  # already there
 
     await resources.async_create_item(
