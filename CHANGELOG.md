@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.1.4](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.1.3...v1.1.4) (2026-11-13)
+
+
+### Miscellaneous Chores
+
+* **deps:** lock file maintenance ([#102](https://github.com/bakerkj/ha-switch-port-card-pro/issues/102)) ([e83d2aa](https://github.com/bakerkj/ha-switch-port-card-pro/commit/e83d2aa5d55164f6ac32d259f17eb8a1af06684a))
+* **deps:** update anthropics/claude-code-action action to v1.0.271 ([#99](https://github.com/bakerkj/ha-switch-port-card-pro/issues/99)) ([fc3364f](https://github.com/bakerkj/ha-switch-port-card-pro/commit/fc3364fb9585e705daf947c74743ba4fd84ffc07))
+* **deps:** update dependency uv to v0.13.8 ([#104](https://github.com/bakerkj/ha-switch-port-card-pro/issues/104)) ([4b7ef87](https://github.com/bakerkj/ha-switch-port-card-pro/commit/4b7ef872e878d87d879dc0305335d9c495bc0886))
+* **deps:** update pre-commit hook kjanat/actionlint to v1.17.1 ([#100](https://github.com/bakerkj/ha-switch-port-card-pro/issues/100)) ([73fde78](https://github.com/bakerkj/ha-switch-port-card-pro/commit/73fde78813ecea43f492470ebd9b6299fe06dc0c))
+* **deps:** update pre-commit hooks ([#103](https://github.com/bakerkj/ha-switch-port-card-pro/issues/103)) ([41f1314](https://github.com/bakerkj/ha-switch-port-card-pro/commit/41f131464a4d14314dacf4a856a6342699493cd9))
+
 ## [1.1.3](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.1.2...v1.1.3) (2026-11-06)
 
 
