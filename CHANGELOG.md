@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.5](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.1.4...v1.1.5) (2026-11-24)
+
+
+### Performance Improvements
+
+* **poll:** issue the HP cpu/memory/firmware fallbacks concurrently ([#114](https://github.com/bakerkj/ha-switch-port-card-pro/issues/114)) ([ba45684](https://github.com/bakerkj/ha-switch-port-card-pro/commit/ba456844bfacc62eeb652b0336c6e1d0ce1c6d83))
+
 ## [1.1.4](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.1.3...v1.1.4) (2026-11-24)
 
 
