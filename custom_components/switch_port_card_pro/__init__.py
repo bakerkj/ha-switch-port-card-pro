@@ -16,6 +16,7 @@ from typing import Any
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from puresnmp.exc import SnmpError
 
@@ -27,6 +28,7 @@ from .const import (
     CONF_HOST,
     CONF_INCLUDE_VLANS,
     CONF_MAX_CLIENTS_TO_LINK,
+    CONF_OID_SYSNAME,
     CONF_PORTS,
     CONF_PRIORITY_PORTS,
     CONF_RECORD_DECIMATION,
@@ -43,6 +45,7 @@ from .entity_manager import PortEntityManager
 from .sensor import SwitchPortCoordinator
 from .snmp_helper import (
     async_prewarm_plugins,
+    async_snmp_get,
     discover_physical_ports,
 )
 
@@ -52,6 +55,11 @@ _LOGGER = logging.getLogger(__name__)
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
+
+# Reachability probe at setup: one sysName GET, kept short so a switch that is
+# down is reported within seconds instead of after the full poll's timeouts.
+REACHABILITY_TIMEOUT_S = 5
+REACHABILITY_RETRIES = 1
 
 
 CARD_RESOURCE_BASES = ("/hacsfiles", "/local/community")
@@ -173,6 +181,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Pre-warm puresnmp plugin loaders once per process to keep SNMP calls
     # off of HA's blocking-call detector.
     await async_prewarm_plugins(hass)
+
+    # A switch that is down would otherwise spend minutes in SNMP timeouts
+    # (discovery, then the first full poll), holding up HA startup until HA
+    # cancels this setup. A cancelled setup ends in setup_error, which HA never
+    # retries. ConfigEntryNotReady puts the entry in setup_retry instead, so HA
+    # retries with backoff and the entry loads once the switch answers.
+    sys_name = await async_snmp_get(
+        hass,
+        host,
+        community,
+        snmp_port,
+        CONF_OID_SYSNAME,
+        timeout=REACHABILITY_TIMEOUT_S,
+        retries=REACHABILITY_RETRIES,
+        mp_model=mp_model,
+    )
+    if sys_name is None:
+        raise ConfigEntryNotReady(f"No SNMP response from {host}:{snmp_port}")
 
     # === PORT DISCOVERY WITH SMART FALLBACK ===
     detected = None
