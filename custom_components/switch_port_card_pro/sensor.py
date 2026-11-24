@@ -1061,65 +1061,52 @@ class SwitchPortCoordinator(DataUpdateCoordinator[SwitchPortData]):
             # manufacturer detection was added — OIDs return None on non-HP switches).
             # Note: is_hp / is_unknown_manufacturer already computed above for PoE detection.
             if is_hp or is_unknown_manufacturer:
-                if (
+                want_cpu = (
                     not self.system_oids.get("cpu", "").strip()
                     and system.get("cpu") is None
-                ):
-                    hp_cpu = await async_snmp_get(
-                        self.hass,
-                        self.host,
-                        self.community,
-                        self.snmp_port,
-                        HP_OID_CPU_REALTIME,
-                        mp_model=self.mp_model,
-                    )
-                    if hp_cpu is not None:
-                        system["cpu"] = hp_cpu
-                if (
+                )
+                want_memory = (
                     not self.system_oids.get("memory", "").strip()
                     and system.get("memory") is None
-                ):
-                    hp_used, hp_total = await asyncio.gather(
-                        async_snmp_get(
-                            self.hass,
-                            self.host,
-                            self.community,
-                            self.snmp_port,
-                            HP_OID_MEMORY_USED,
-                            mp_model=self.mp_model,
-                        ),
-                        async_snmp_get(
-                            self.hass,
-                            self.host,
-                            self.community,
-                            self.snmp_port,
-                            HP_OID_MEMORY_TOTAL,
-                            mp_model=self.mp_model,
-                        ),
-                    )
-                    if hp_used is not None and hp_total is not None:
-                        try:
-                            system["memory"] = (
-                                round(float(hp_used) / float(hp_total) * 100, 1)
-                                if float(hp_total) > 0
-                                else None
-                            )
-                        except ValueError, TypeError:
-                            pass
-                if (
+                )
+                want_firmware = (
                     not self.system_oids.get("firmware", "").strip()
                     and system.get("firmware") is None
-                ):
-                    hp_fw = await async_snmp_get(
+                )
+
+                async def _hp_get(oid: str, wanted: bool) -> str | None:
+                    if not wanted:
+                        return None
+                    return await async_snmp_get(
                         self.hass,
                         self.host,
                         self.community,
                         self.snmp_port,
-                        HP_OID_FIRMWARE,
+                        oid,
                         mp_model=self.mp_model,
                     )
-                    if hp_fw is not None:
-                        system["firmware"] = str(hp_fw).strip() or system["firmware"]
+
+                # Each fallback depends only on the system bulk above, not on
+                # the others, so they go out together in one round trip.
+                hp_cpu, hp_used, hp_total, hp_fw = await asyncio.gather(
+                    _hp_get(HP_OID_CPU_REALTIME, want_cpu),
+                    _hp_get(HP_OID_MEMORY_USED, want_memory),
+                    _hp_get(HP_OID_MEMORY_TOTAL, want_memory),
+                    _hp_get(HP_OID_FIRMWARE, want_firmware),
+                )
+                if hp_cpu is not None:
+                    system["cpu"] = hp_cpu
+                if hp_used is not None and hp_total is not None:
+                    try:
+                        system["memory"] = (
+                            round(float(hp_used) / float(hp_total) * 100, 1)
+                            if float(hp_total) > 0
+                            else None
+                        )
+                    except ValueError, TypeError:
+                        pass
+                if hp_fw is not None:
+                    system["firmware"] = str(hp_fw).strip() or system["firmware"]
 
             # PoE budget (RFC 3621) + ENTITY-SENSOR-MIB (RFC 3433) — all in parallel
             (
