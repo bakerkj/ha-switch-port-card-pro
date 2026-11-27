@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.6](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.1.5...v1.1.6) (2026-11-27)
+
+
+### Miscellaneous Chores
+
+* **deps:** lock file maintenance ([#116](https://github.com/bakerkj/ha-switch-port-card-pro/issues/116)) ([59c2321](https://github.com/bakerkj/ha-switch-port-card-pro/commit/59c232199c08ab66feb314df7fe350b620e7f515))
+
 ## [1.1.5](https://github.com/bakerkj/ha-switch-port-card-pro/compare/v1.1.4...v1.1.5) (2026-11-24)
 
 
